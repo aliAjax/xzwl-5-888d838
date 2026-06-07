@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import type { HandpanRecord, DeliveryStatus } from '@/types/record';
-import { MODE_OPTIONS, DELIVERY_STATUS_OPTIONS } from '@/types/record';
+import { DELIVERY_STATUS_OPTIONS } from '@/types/record';
 import { generateId } from '@/utils/storage';
+import { getModeOptionsForForm, getAllModeNames } from '@/utils/modeStorage';
 
 interface RecordFormProps {
   isOpen: boolean;
@@ -12,9 +13,10 @@ interface RecordFormProps {
 }
 
 export function RecordForm({ isOpen, onClose, onSave, editingRecord }: RecordFormProps) {
+  const [modeOptions, setModeOptions] = useState<string[]>([]);
   const [formData, setFormData] = useState<Omit<HandpanRecord, 'id' | 'createdAt' | 'updatedAt'>>({
     serialNumber: '',
-    mode: 'D Kurd',
+    mode: '',
     noteCount: 9,
     lastTuningDate: new Date().toISOString().split('T')[0],
     deviationNote: '',
@@ -25,28 +27,43 @@ export function RecordForm({ isOpen, onClose, onSave, editingRecord }: RecordFor
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
 
   useEffect(() => {
-    if (editingRecord) {
-      setFormData({
-        serialNumber: editingRecord.serialNumber,
-        mode: editingRecord.mode,
-        noteCount: editingRecord.noteCount,
-        lastTuningDate: editingRecord.lastTuningDate,
-        deviationNote: editingRecord.deviationNote,
-        customerNickname: editingRecord.customerNickname,
-        deliveryStatus: editingRecord.deliveryStatus,
-      });
-    } else {
-      setFormData({
-        serialNumber: '',
-        mode: 'D Kurd',
-        noteCount: 9,
-        lastTuningDate: new Date().toISOString().split('T')[0],
-        deviationNote: '',
-        customerNickname: '',
-        deliveryStatus: 'pending',
-      });
+    if (isOpen) {
+      const activeModes = getModeOptionsForForm();
+      let allOptions = [...activeModes];
+
+      if (editingRecord && editingRecord.mode) {
+        if (!allOptions.includes(editingRecord.mode)) {
+          allOptions = [editingRecord.mode, ...allOptions];
+        }
+      }
+
+      setModeOptions(allOptions);
+
+      const defaultMode = editingRecord?.mode || activeModes[0] || '';
+      
+      if (editingRecord) {
+        setFormData({
+          serialNumber: editingRecord.serialNumber,
+          mode: editingRecord.mode,
+          noteCount: editingRecord.noteCount,
+          lastTuningDate: editingRecord.lastTuningDate,
+          deviationNote: editingRecord.deviationNote,
+          customerNickname: editingRecord.customerNickname,
+          deliveryStatus: editingRecord.deliveryStatus,
+        });
+      } else {
+        setFormData({
+          serialNumber: '',
+          mode: defaultMode,
+          noteCount: 9,
+          lastTuningDate: new Date().toISOString().split('T')[0],
+          deviationNote: '',
+          customerNickname: '',
+          deliveryStatus: 'pending',
+        });
+      }
+      setErrors({});
     }
-    setErrors({});
   }, [editingRecord, isOpen]);
 
   const validate = (): boolean => {
@@ -160,11 +177,19 @@ export function RecordForm({ isOpen, onClose, onSave, editingRecord }: RecordFor
                   onChange={(e) => handleChange('mode', e.target.value)}
                   className="select-field"
                 >
-                  {MODE_OPTIONS.map((mode) => (
-                    <option key={mode} value={mode}>
-                      {mode}
-                    </option>
-                  ))}
+                  {modeOptions.map((mode) => {
+                    const isEditingExisting = editingRecord && editingRecord.mode === mode;
+                    const isActive = getModeOptionsForForm().includes(mode);
+                    return (
+                      <option 
+                        key={mode} 
+                        value={mode}
+                        disabled={!isActive && !isEditingExisting}
+                      >
+                        {mode}{!isActive ? ' (已停用)' : ''}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 

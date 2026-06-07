@@ -27,19 +27,30 @@ export const DELIVERY_STATUS_OPTIONS: { value: DeliveryStatus; label: string; co
   { value: 'delivered', label: '已交付', color: 'bg-brass-50 text-brass-700 border-brass-400' },
 ];
 
-export const MODE_OPTIONS = [
-  'D Kurd',
-  'D Celtic',
-  'D Integral',
-  'C# Amara',
-  'E Low Pygmy',
-  'F# Hijaz',
-  'G Golden Gate',
-  'A Aegean',
-  'B Celtic Minor',
-  'C Pygmy',
-  '其他'
+export interface ModeOption {
+  id: string;
+  name: string;
+  active: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const DEFAULT_MODE_OPTIONS: ModeOption[] = [
+  { id: 'mode-d-kurd', name: 'D Kurd', active: true, sortOrder: 0, createdAt: '', updatedAt: '' },
+  { id: 'mode-d-celtic', name: 'D Celtic', active: true, sortOrder: 1, createdAt: '', updatedAt: '' },
+  { id: 'mode-d-integral', name: 'D Integral', active: true, sortOrder: 2, createdAt: '', updatedAt: '' },
+  { id: 'mode-csharp-amara', name: 'C# Amara', active: true, sortOrder: 3, createdAt: '', updatedAt: '' },
+  { id: 'mode-e-low-pygmy', name: 'E Low Pygmy', active: true, sortOrder: 4, createdAt: '', updatedAt: '' },
+  { id: 'mode-fsharp-hijaz', name: 'F# Hijaz', active: true, sortOrder: 5, createdAt: '', updatedAt: '' },
+  { id: 'mode-g-golden-gate', name: 'G Golden Gate', active: true, sortOrder: 6, createdAt: '', updatedAt: '' },
+  { id: 'mode-a-aegean', name: 'A Aegean', active: true, sortOrder: 7, createdAt: '', updatedAt: '' },
+  { id: 'mode-b-celtic-minor', name: 'B Celtic Minor', active: true, sortOrder: 8, createdAt: '', updatedAt: '' },
+  { id: 'mode-c-pygmy', name: 'C Pygmy', active: true, sortOrder: 9, createdAt: '', updatedAt: '' },
+  { id: 'mode-other', name: '其他', active: true, sortOrder: 10, createdAt: '', updatedAt: '' },
 ];
+
+export const MODE_OPTIONS = DEFAULT_MODE_OPTIONS.map(m => m.name);
 
 export const getStatusLabel = (status: DeliveryStatus): string => {
   const option = DELIVERY_STATUS_OPTIONS.find(opt => opt.value === status);

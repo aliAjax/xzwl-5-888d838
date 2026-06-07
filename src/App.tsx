@@ -9,6 +9,7 @@ import { RecordForm } from '@/components/RecordForm';
 import { FloatingButton } from '@/components/FloatingButton';
 import { ImportPreview } from '@/components/ImportPreview';
 import { DeliveryOrder } from '@/components/DeliveryOrder';
+import { ModeManager } from '@/components/ModeManager';
 import { parseImportData, analyzeImportData, mergeImportedRecords, type ImportAnalysis } from '@/utils/storage';
 
 const STORAGE_KEY = 'handpan_records';
@@ -103,6 +104,7 @@ function App() {
   const [importFileName, setImportFileName] = useState('');
   const [isDeliveryOpen, setIsDeliveryOpen] = useState(false);
   const [deliveryRecord, setDeliveryRecord] = useState<HandpanRecord | null>(null);
+  const [isModeManagerOpen, setIsModeManagerOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleOpenAdd = () => {
@@ -192,6 +194,14 @@ function App() {
     setDeliveryRecord(null);
   };
 
+  const handleOpenModeManager = () => {
+    setIsModeManagerOpen(true);
+  };
+
+  const handleCloseModeManager = () => {
+    setIsModeManagerOpen(false);
+  };
+
   return (
     <div className="min-h-screen pb-8">
       <input
@@ -201,8 +211,8 @@ function App() {
         onChange={handleFileSelect}
         className="hidden"
       />
-      <Header onImportClick={handleImportClick} />
-      <FilterBar filters={filters} onFilterChange={setFilters} />
+      <Header onImportClick={handleImportClick} onModeManagerClick={handleOpenModeManager} />
+      <FilterBar filters={filters} onFilterChange={setFilters} records={records} />
       <TuningReminderBoard records={records} filters={filters} onFilterChange={setFilters} />
       <RecordList 
         records={records} 
@@ -229,6 +239,10 @@ function App() {
         isOpen={isDeliveryOpen}
         onClose={handleCloseDelivery}
         record={deliveryRecord}
+      />
+      <ModeManager
+        isOpen={isModeManagerOpen}
+        onClose={handleCloseModeManager}
       />
     </div>
   );

@@ -1,13 +1,17 @@
 import { Filter, Search, X } from 'lucide-react';
-import type { FilterState, DeliveryStatus } from '@/types/record';
-import { MODE_OPTIONS, DELIVERY_STATUS_OPTIONS } from '@/types/record';
+import type { FilterState, DeliveryStatus, HandpanRecord } from '@/types/record';
+import { DELIVERY_STATUS_OPTIONS } from '@/types/record';
+import { getModeOptionsForFilter } from '@/utils/modeStorage';
 
 interface FilterBarProps {
   filters: FilterState;
   onFilterChange: (filters: FilterState) => void;
+  records: HandpanRecord[];
 }
 
-export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
+export function FilterBar({ filters, onFilterChange, records }: FilterBarProps) {
+  const modeOptions = getModeOptionsForFilter(records);
+
   const handleModeChange = (mode: string) => {
     onFilterChange({ ...filters, mode, reminderType: '' });
   };
@@ -66,9 +70,9 @@ export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
               className="select-field"
             >
               <option value="">全部调式</option>
-              {MODE_OPTIONS.map((mode) => (
-                <option key={mode} value={mode}>
-                  {mode}
+              {modeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
                 </option>
               ))}
             </select>
