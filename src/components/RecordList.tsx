@@ -1,5 +1,6 @@
 import { Music2 } from 'lucide-react';
 import type { HandpanRecord, FilterState } from '@/types/record';
+import { getDaysDiff } from '@/types/record';
 import { RecordCard } from './RecordCard';
 
 interface RecordListProps {
@@ -17,7 +18,24 @@ export function RecordList({ records, filters, onEdit, onDelete }: RecordListPro
       record.serialNumber.toLowerCase().includes(filters.search.toLowerCase()) ||
       record.customerNickname.toLowerCase().includes(filters.search.toLowerCase()) ||
       record.mode.toLowerCase().includes(filters.search.toLowerCase());
-    return matchesMode && matchesStatus && matchesSearch;
+    
+    let matchesReminder = true;
+    if (filters.reminderType) {
+      const daysSinceTuning = getDaysDiff(record.lastTuningDate);
+      switch (filters.reminderType) {
+        case 'pending-review':
+          matchesReminder = record.deliveryStatus === 'completed';
+          break;
+        case 'upcoming-due':
+          matchesReminder = record.deliveryStatus === 'delivered' && daysSinceTuning >= 60 && daysSinceTuning < 90;
+          break;
+        case 'recently-completed':
+          matchesReminder = record.deliveryStatus === 'delivered' && daysSinceTuning < 30;
+          break;
+      }
+    }
+    
+    return matchesMode && matchesStatus && matchesSearch && matchesReminder;
   });
 
   const sortedRecords = [...filteredRecords].sort((a, b) => 

@@ -3,6 +3,7 @@ import type { HandpanRecord, FilterState } from '@/types/record';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Header } from '@/components/Header';
 import { FilterBar } from '@/components/FilterBar';
+import { TuningReminderBoard } from '@/components/TuningReminderBoard';
 import { RecordList } from '@/components/RecordList';
 import { RecordForm } from '@/components/RecordForm';
 import { FloatingButton } from '@/components/FloatingButton';
@@ -14,51 +15,75 @@ const STORAGE_KEY = 'handpan_records';
 const SAMPLE_RECORDS: HandpanRecord[] = [
   {
     id: 'sample-1',
-    serialNumber: 'HP-2024-001',
+    serialNumber: 'HP-2026-001',
     mode: 'D Kurd',
     noteCount: 9,
-    lastTuningDate: '2024-01-15',
+    lastTuningDate: '2026-05-20',
     deviationNote: 'Ding 音偏低 5 音分，已校准至标准音高。D3 音共振良好，无需调整。',
     customerNickname: '小李',
     deliveryStatus: 'delivered',
-    createdAt: '2024-01-10T10:00:00Z',
-    updatedAt: '2024-01-15T14:30:00Z',
+    createdAt: '2026-05-15T10:00:00Z',
+    updatedAt: '2026-05-20T14:30:00Z',
   },
   {
     id: 'sample-2',
-    serialNumber: 'HP-2024-002',
+    serialNumber: 'HP-2026-002',
     mode: 'C# Amara',
     noteCount: 10,
-    lastTuningDate: '2024-01-20',
+    lastTuningDate: '2026-06-01',
     deviationNote: '低八度区整体偏紧，放松了 3 个音位。整体音色更加圆润。',
     customerNickname: '老王',
     deliveryStatus: 'completed',
-    createdAt: '2024-01-18T09:00:00Z',
-    updatedAt: '2024-01-20T16:00:00Z',
+    createdAt: '2026-05-28T09:00:00Z',
+    updatedAt: '2026-06-01T16:00:00Z',
   },
   {
     id: 'sample-3',
-    serialNumber: 'HP-2024-003',
+    serialNumber: 'HP-2026-003',
     mode: 'E Low Pygmy',
     noteCount: 8,
-    lastTuningDate: '2024-01-25',
+    lastTuningDate: '2026-04-05',
     deviationNote: '',
     customerNickname: '小张',
-    deliveryStatus: 'in-progress',
-    createdAt: '2024-01-22T11:00:00Z',
-    updatedAt: '2024-01-23T10:00:00Z',
+    deliveryStatus: 'delivered',
+    createdAt: '2026-04-01T11:00:00Z',
+    updatedAt: '2026-04-05T10:00:00Z',
   },
   {
     id: 'sample-4',
-    serialNumber: 'HP-2024-004',
+    serialNumber: 'HP-2026-004',
     mode: 'D Celtic',
     noteCount: 9,
-    lastTuningDate: '2024-01-28',
+    lastTuningDate: '2026-04-10',
     deviationNote: '',
     customerNickname: '阿花',
-    deliveryStatus: 'pending',
-    createdAt: '2024-01-26T14:00:00Z',
-    updatedAt: '2024-01-26T14:00:00Z',
+    deliveryStatus: 'delivered',
+    createdAt: '2026-04-05T14:00:00Z',
+    updatedAt: '2026-04-10T14:00:00Z',
+  },
+  {
+    id: 'sample-5',
+    serialNumber: 'HP-2026-005',
+    mode: 'F# Hijaz',
+    noteCount: 11,
+    lastTuningDate: '2026-05-15',
+    deviationNote: '高音区泛音丰富，调整了 Ding 音的谐波。',
+    customerNickname: '老刘',
+    deliveryStatus: 'completed',
+    createdAt: '2026-05-10T10:00:00Z',
+    updatedAt: '2026-05-15T11:00:00Z',
+  },
+  {
+    id: 'sample-6',
+    serialNumber: 'HP-2026-006',
+    mode: 'G Golden Gate',
+    noteCount: 9,
+    lastTuningDate: '2026-06-05',
+    deviationNote: '',
+    customerNickname: '小陈',
+    deliveryStatus: 'in-progress',
+    createdAt: '2026-06-03T09:00:00Z',
+    updatedAt: '2026-06-04T15:00:00Z',
   },
 ];
 
@@ -70,6 +95,7 @@ function App() {
     mode: '',
     deliveryStatus: '',
     search: '',
+    reminderType: '',
   });
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [importAnalysis, setImportAnalysis] = useState<ImportAnalysis | null>(null);
@@ -164,6 +190,7 @@ function App() {
       />
       <Header onImportClick={handleImportClick} />
       <FilterBar filters={filters} onFilterChange={setFilters} />
+      <TuningReminderBoard records={records} filters={filters} onFilterChange={setFilters} />
       <RecordList 
         records={records} 
         filters={filters} 

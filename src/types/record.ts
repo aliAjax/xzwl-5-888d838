@@ -17,6 +17,7 @@ export interface FilterState {
   mode: string;
   deliveryStatus: DeliveryStatus | '';
   search: string;
+  reminderType: ReminderType | '';
 }
 
 export const DELIVERY_STATUS_OPTIONS: { value: DeliveryStatus; label: string; color: string }[] = [
@@ -49,3 +50,101 @@ export const getStatusColor = (status: DeliveryStatus): string => {
   const option = DELIVERY_STATUS_OPTIONS.find(opt => opt.value === status);
   return option ? option.color : 'bg-gray-100 text-gray-700';
 };
+
+export type ReminderType = 'pending-review' | 'upcoming-due' | 'recently-completed';
+
+export interface ReminderCategory {
+  type: ReminderType;
+  label: string;
+  description: string;
+  color: string;
+  bgColor: string;
+  borderColor: string;
+  iconColor: string;
+}
+
+export interface ReminderResult {
+  category: ReminderCategory;
+  records: HandpanRecord[];
+  count: number;
+}
+
+export const REMINDER_CATEGORIES: ReminderCategory[] = [
+  {
+    type: 'pending-review',
+    label: '待复查',
+    description: '调音完成待复查交付',
+    color: 'text-amber-700',
+    bgColor: 'bg-amber-50',
+    borderColor: 'border-amber-300',
+    iconColor: 'text-amber-500',
+  },
+  {
+    type: 'upcoming-due',
+    label: '即将到期',
+    description: '距上次调音60-90天',
+    color: 'text-rose-700',
+    bgColor: 'bg-rose-50',
+    borderColor: 'border-rose-300',
+    iconColor: 'text-rose-500',
+  },
+  {
+    type: 'recently-completed',
+    label: '已完成',
+    description: '近30天内交付完成',
+    color: 'text-emerald-700',
+    bgColor: 'bg-emerald-50',
+    borderColor: 'border-emerald-300',
+    iconColor: 'text-emerald-500',
+  },
+];
+
+export const getDaysDiff = (dateStr: string): number => {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffTime = Math.abs(now.getTime() - date.getTime());
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays;
+};
+
+export const calculateReminders = (records: HandpanRecord[]): ReminderResult[] => {
+  const pendingReview: HandpanRecord[] = [];
+  const upcomingDue: HandpanRecord[] = [];
+  const recentlyCompleted: HandpanRecord[] = [];
+
+  records.forEach((record) => {
+    const daysSinceTuning = getDaysDiff(record.lastTuningDate);
+
+    if (record.deliveryStatus === 'completed') {
+      pendingReview.push(record);
+    }
+
+    if (record.deliveryStatus === 'delivered' && daysSinceTuning >= 60 && daysSinceTuning < 90) {
+      upcomingDue.push(record);
+    }
+
+    if (record.deliveryStatus === 'delivered' && daysSinceTuning < 30) {
+      recentlyCompleted.push(record);
+    }
+  });
+
+  return [
+    {
+      category: REMINDER_CATEGORIES[0],
+      records: pendingReview,
+      count: pendingReview.length,
+    },
+    {
+      category: REMINDER_CATEGORIES[1],
+      records: upcomingDue,
+      count: upcomingDue.length,
+    },
+    {
+      category: REMINDER_CATEGORIES[2],
+      records: recentlyCompleted,
+      count: recentlyCompleted.length,
+    },
+  ];
+};
+
+

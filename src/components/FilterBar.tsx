@@ -9,22 +9,22 @@ interface FilterBarProps {
 
 export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
   const handleModeChange = (mode: string) => {
-    onFilterChange({ ...filters, mode });
+    onFilterChange({ ...filters, mode, reminderType: '' });
   };
 
   const handleStatusChange = (deliveryStatus: DeliveryStatus | '') => {
-    onFilterChange({ ...filters, deliveryStatus });
+    onFilterChange({ ...filters, deliveryStatus, reminderType: '' });
   };
 
   const handleSearchChange = (search: string) => {
-    onFilterChange({ ...filters, search });
+    onFilterChange({ ...filters, search, reminderType: '' });
   };
 
   const handleClear = () => {
-    onFilterChange({ mode: '', deliveryStatus: '', search: '' });
+    onFilterChange({ mode: '', deliveryStatus: '', search: '', reminderType: '' });
   };
 
-  const hasActiveFilters = filters.mode || filters.deliveryStatus || filters.search;
+  const hasActiveFilters = filters.mode || filters.deliveryStatus || filters.search || filters.reminderType;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
