@@ -8,9 +8,10 @@ interface RecordCardProps {
   onDelete: (id: string) => void;
   onGenerateDelivery: (record: HandpanRecord) => void;
   index: number;
+  showDeliveryButton?: boolean;
 }
 
-export function RecordCard({ record, onEdit, onDelete, onGenerateDelivery, index }: RecordCardProps) {
+export function RecordCard({ record, onEdit, onDelete, onGenerateDelivery, index, showDeliveryButton = true }: RecordCardProps) {
   const handleDelete = () => {
     if (confirm(`确定要删除记录 "${record.serialNumber}" 吗？`)) {
       onDelete(record.id);
@@ -73,15 +74,17 @@ export function RecordCard({ record, onEdit, onDelete, onGenerateDelivery, index
         </div>
       )}
 
-      <div className="flex items-center justify-between pt-3 border-t border-clay-100">
-        <button
-          onClick={() => onGenerateDelivery(record)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-brass-600 hover:text-brass-700 hover:bg-brass-50 transition-all"
-          title="生成交付单"
-        >
-          <FileText className="w-4 h-4" />
-          <span>交付单</span>
-        </button>
+      <div className={`flex items-center pt-3 border-t border-clay-100 ${showDeliveryButton ? 'justify-between' : 'justify-end'}`}>
+        {showDeliveryButton && (
+          <button
+            onClick={() => onGenerateDelivery(record)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-brass-600 hover:text-brass-700 hover:bg-brass-50 transition-all"
+            title="生成交付单"
+          >
+            <FileText className="w-4 h-4" />
+            <span>交付单</span>
+          </button>
+        )}
         <div className="flex items-center gap-2">
           <button
             onClick={() => onEdit(record)}

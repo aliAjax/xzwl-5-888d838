@@ -106,16 +106,14 @@ export function DeliveryOrder({ isOpen, onClose, record }: DeliveryOrderProps) {
               </span>
             </div>
 
-            {record.deviationNote && (
-              <div className="space-y-3 pt-2">
-                <p className="text-xs text-ink-400 uppercase tracking-wider">偏音说明</p>
-                <div className="bg-ink-50 rounded-xl p-5 border border-ink-100">
-                  <p className="text-ink-500 leading-relaxed whitespace-pre-wrap">
-                    {record.deviationNote}
-                  </p>
-                </div>
+            <div className="space-y-3 pt-2">
+              <p className="text-xs text-ink-400 uppercase tracking-wider">偏音说明</p>
+              <div className="bg-ink-50 rounded-xl p-5 border border-ink-100">
+                <p className="text-ink-500 leading-relaxed whitespace-pre-wrap">
+                  {record.deviationNote || <span className="text-ink-300">无</span>}
+                </p>
               </div>
-            )}
+            </div>
 
             <div className="pt-6 mt-6 border-t-2 border-clay-100">
               <div className="grid grid-cols-2 gap-8">

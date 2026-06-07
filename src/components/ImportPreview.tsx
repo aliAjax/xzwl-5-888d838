@@ -139,6 +139,7 @@ export function ImportPreview({ isOpen, onClose, onConfirm, analysis, fileName }
                       onDelete={handleDelete}
                       onGenerateDelivery={handleGenerateDelivery}
                       index={index}
+                      showDeliveryButton={false}
                     />
                   ))}
                 </div>
