@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Calendar, FileText, ArrowRight, Music, Hash, User, Tag, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
-import type { HandpanRecord, TuningRecord } from '@/types/record';
-import { compareTuningRecords, getStatusLabel, getStatusColor, getLatestTuning } from '@/types/record';
+import { X, Plus, Calendar, FileText, ArrowRight, Music, Hash, User, Tag, Clock, CheckCircle2, AlertCircle, Activity, Target } from 'lucide-react';
+import type { HandpanRecord, TuningRecord, PhonemeDeviation } from '@/types/record';
+import { compareTuningRecords, getStatusLabel, getStatusColor, getLatestTuning, getPhonemeNames, createEmptyPhonemeDeviations, getMaxDeviation, getCalibratedCount } from '@/types/record';
+import { PhonemeDeviationTable } from '@/components/PhonemeDeviationTable';
 
 interface RecordDetailProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ interface TuningFormData {
   beforeStatus: string;
   afterStatus: string;
   remark: string;
+  phonemeDeviations?: PhonemeDeviation[];
 }
 
 export function RecordDetail({ isOpen, onClose, record, onAddTuning }: RecordDetailProps) {
@@ -26,18 +28,21 @@ export function RecordDetail({ isOpen, onClose, record, onAddTuning }: RecordDet
     beforeStatus: '',
     afterStatus: '',
     remark: '',
+    phonemeDeviations: [],
   });
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
 
   useEffect(() => {
     if (isOpen && record) {
       const latestTuning = getLatestTuning(record);
+      const phonemeNames = getPhonemeNames(record, record.noteCount);
       setFormData({
         date: new Date().toISOString().split('T')[0],
         deviationNote: '',
         beforeStatus: latestTuning?.afterStatus || '',
         afterStatus: '',
         remark: '',
+        phonemeDeviations: createEmptyPhonemeDeviations(phonemeNames),
       });
       setShowAddForm(false);
       setErrors({});
@@ -84,24 +89,36 @@ export function RecordDetail({ isOpen, onClose, record, onAddTuning }: RecordDet
       beforeStatus: formData.beforeStatus,
       afterStatus: formData.afterStatus,
       remark: formData.remark,
+      phonemeDeviations: formData.phonemeDeviations,
     });
 
+    const phonemeNames = getPhonemeNames(record, record.noteCount);
     setFormData({
       date: new Date().toISOString().split('T')[0],
       deviationNote: '',
       beforeStatus: formData.afterStatus,
       afterStatus: '',
       remark: '',
+      phonemeDeviations: createEmptyPhonemeDeviations(phonemeNames),
     });
     setShowAddForm(false);
     setErrors({});
   };
 
-  const handleChange = (field: keyof TuningFormData, value: string) => {
+  const handleChange = (field: keyof TuningFormData, value: string | PhonemeDeviation[]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: undefined }));
     }
+  };
+
+  const handlePhonemeNamesChange = (names: string[]) => {
+    if (!formData.phonemeDeviations) return;
+    const newDeviations = formData.phonemeDeviations.map((d, i) => ({
+      ...d,
+      name: names[i] || d.name,
+    }));
+    handleChange('phonemeDeviations', newDeviations);
   };
 
   const sortedHistory = record?.tuningHistory
@@ -244,6 +261,22 @@ export function RecordDetail({ isOpen, onClose, record, onAddTuning }: RecordDet
 
                   <div>
                     <label className="block text-sm font-medium text-ink-500 mb-1.5">
+                      音位偏差记录
+                    </label>
+                    <div className="bg-white rounded-lg border border-clay-200 p-3">
+                      <PhonemeDeviationTable
+                        mode="edit"
+                        deviations={formData.phonemeDeviations || []}
+                        onChange={(deviations) => handleChange('phonemeDeviations', deviations)}
+                        noteCount={record.noteCount}
+                        defaultNames={getPhonemeNames(record, record.noteCount)}
+                        onNamesChange={handlePhonemeNamesChange}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-ink-500 mb-1.5">
                       偏音说明
                     </label>
                     <textarea
@@ -303,72 +336,62 @@ export function RecordDetail({ isOpen, onClose, record, onAddTuning }: RecordDet
               <div className="relative">
                 <div className="absolute left-6 top-2 bottom-2 w-0.5 bg-clay-200" />
                 
-                {sortedHistory.map((tuning, index) => (
-                  <div key={tuning.id} className="relative pl-16 pb-8 last:pb-0">
-                    <div className={`absolute left-4 w-5 h-5 rounded-full border-4 ${
-                      index === 0 
-                        ? 'bg-brass-500 border-brass-200' 
-                        : 'bg-white border-clay-300'
-                    }`}>
-                      {index === 0 && (
-                        <CheckCircle2 className="w-3 h-3 text-white -translate-x-0.5 -translate-y-0.5" />
-                      )}
-                    </div>
-                    
-                    <div className={`rounded-xl p-5 border ${
-                      index === 0 
-                        ? 'bg-brass-50/50 border-brass-200 shadow-sm' 
-                        : 'bg-white border-clay-100'
-                    }`}>
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-ink-400" />
-                          <span className="font-semibold text-ink-500">
-                            {formatDate(tuning.date)}
-                          </span>
-                          {index === 0 && (
-                            <span className="bg-brass-100 text-brass-700 px-2 py-0.5 rounded-full text-xs font-medium">
-                              最新
+                {sortedHistory.map((tuning, index) => {
+                  const maxDeviation = getMaxDeviation(tuning);
+                  const calibratedCount = getCalibratedCount(tuning);
+                  const hasDeviationData = maxDeviation !== null || calibratedCount > 0;
+
+                  return (
+                    <div key={tuning.id} className="relative pl-16 pb-8 last:pb-0">
+                      <div className={`absolute left-4 w-5 h-5 rounded-full border-4 ${
+                        index === 0 
+                          ? 'bg-brass-500 border-brass-200' 
+                          : 'bg-white border-clay-300'
+                      }`}>
+                        {index === 0 && (
+                          <CheckCircle2 className="w-3 h-3 text-white -translate-x-0.5 -translate-y-0.5" />
+                        )}
+                      </div>
+                      
+                      <div className={`rounded-xl p-5 border ${
+                        index === 0 
+                          ? 'bg-brass-50/50 border-brass-200 shadow-sm' 
+                          : 'bg-white border-clay-100'
+                      }`}>
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Calendar className="w-4 h-4 text-ink-400" />
+                            <span className="font-semibold text-ink-500">
+                              {formatDate(tuning.date)}
+                            </span>
+                            {index === 0 && (
+                              <span className="bg-brass-100 text-brass-700 px-2 py-0.5 rounded-full text-xs font-medium">
+                                最新
+                              </span>
+                            )}
+                            {hasDeviationData && (
+                              <>
+                                <span className="flex items-center gap-1 bg-clay-100 text-ink-500 px-2 py-0.5 rounded-full text-xs font-medium">
+                                  <Activity className="w-3 h-3" />
+                                  最大偏差 {maxDeviation?.toFixed(1)} 音分
+                                </span>
+                                <span className="flex items-center gap-1 bg-clay-100 text-ink-500 px-2 py-0.5 rounded-full text-xs font-medium">
+                                  <Target className="w-3 h-3" />
+                                  已校准 {calibratedCount} 个音位
+                                </span>
+                              </>
+                            )}
+                          </div>
+                          {tuning.remark && (
+                            <span className="text-xs text-ink-400 bg-clay-100 px-2 py-0.5 rounded">
+                              {tuning.remark}
                             </span>
                           )}
                         </div>
-                        {tuning.remark && (
-                          <span className="text-xs text-ink-400 bg-clay-100 px-2 py-0.5 rounded">
-                            {tuning.remark}
-                          </span>
-                        )}
-                      </div>
 
-                      {tuning.beforeStatus && tuning.afterStatus ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                          <div className="bg-amber-50 rounded-lg p-3 border border-amber-100">
-                            <div className="flex items-center gap-1.5 text-xs text-amber-600 mb-1.5">
-                              <AlertCircle className="w-3.5 h-3.5" />
-                              <span className="font-medium">调音前</span>
-                            </div>
-                            <p className="text-sm text-amber-800 leading-relaxed">
-                              {tuning.beforeStatus}
-                            </p>
-                          </div>
-                          <div className="relative">
-                            <div className="absolute -left-1.5 top-1/2 -translate-y-1/2 z-10">
-                              <ArrowRight className="w-5 h-5 text-clay-300 bg-white rounded-full" />
-                            </div>
-                            <div className="bg-green-50 rounded-lg p-3 border border-green-100">
-                              <div className="flex items-center gap-1.5 text-xs text-green-600 mb-1.5">
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                <span className="font-medium">调音后</span>
-                              </div>
-                              <p className="text-sm text-green-800 leading-relaxed">
-                                {tuning.afterStatus}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          {tuning.beforeStatus && (
-                            <div className="bg-amber-50 rounded-lg p-3 border border-amber-100 mb-3">
+                        {tuning.beforeStatus && tuning.afterStatus ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                            <div className="bg-amber-50 rounded-lg p-3 border border-amber-100">
                               <div className="flex items-center gap-1.5 text-xs text-amber-600 mb-1.5">
                                 <AlertCircle className="w-3.5 h-3.5" />
                                 <span className="font-medium">调音前</span>
@@ -377,39 +400,83 @@ export function RecordDetail({ isOpen, onClose, record, onAddTuning }: RecordDet
                                 {tuning.beforeStatus}
                               </p>
                             </div>
-                          )}
-                          {tuning.afterStatus && (
-                            <div className="bg-green-50 rounded-lg p-3 border border-green-100 mb-3">
-                              <div className="flex items-center gap-1.5 text-xs text-green-600 mb-1.5">
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                <span className="font-medium">调音后</span>
+                            <div className="relative">
+                              <div className="absolute -left-1.5 top-1/2 -translate-y-1/2 z-10">
+                                <ArrowRight className="w-5 h-5 text-clay-300 bg-white rounded-full" />
                               </div>
-                              <p className="text-sm text-green-800 leading-relaxed">
-                                {tuning.afterStatus}
-                              </p>
+                              <div className="bg-green-50 rounded-lg p-3 border border-green-100">
+                                <div className="flex items-center gap-1.5 text-xs text-green-600 mb-1.5">
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span className="font-medium">调音后</span>
+                                </div>
+                                <p className="text-sm text-green-800 leading-relaxed">
+                                  {tuning.afterStatus}
+                                </p>
+                              </div>
                             </div>
-                          )}
-                        </>
-                      )}
-
-                      {tuning.deviationNote && (
-                        <div className="bg-clay-50 rounded-lg p-3 border border-clay-100">
-                          <div className="flex items-center gap-1.5 text-xs text-ink-400 mb-1.5">
-                            <FileText className="w-3.5 h-3.5" />
-                            <span className="font-medium">偏音说明</span>
                           </div>
-                          <p className="text-sm text-ink-600 leading-relaxed">
-                            {tuning.deviationNote}
-                          </p>
-                        </div>
-                      )}
+                        ) : (
+                          <>
+                            {tuning.beforeStatus && (
+                              <div className="bg-amber-50 rounded-lg p-3 border border-amber-100 mb-3">
+                                <div className="flex items-center gap-1.5 text-xs text-amber-600 mb-1.5">
+                                  <AlertCircle className="w-3.5 h-3.5" />
+                                  <span className="font-medium">调音前</span>
+                                </div>
+                                <p className="text-sm text-amber-800 leading-relaxed">
+                                  {tuning.beforeStatus}
+                                </p>
+                              </div>
+                            )}
+                            {tuning.afterStatus && (
+                              <div className="bg-green-50 rounded-lg p-3 border border-green-100 mb-3">
+                                <div className="flex items-center gap-1.5 text-xs text-green-600 mb-1.5">
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span className="font-medium">调音后</span>
+                                </div>
+                                <p className="text-sm text-green-800 leading-relaxed">
+                                  {tuning.afterStatus}
+                                </p>
+                              </div>
+                            )}
+                          </>
+                        )}
 
-                      <p className="text-xs text-ink-300 mt-3">
-                        记录于 {formatDateTime(tuning.createdAt)}
-                      </p>
+                        {tuning.phonemeDeviations && tuning.phonemeDeviations.length > 0 && (
+                          <div className="mb-3">
+                            <div className="flex items-center gap-1.5 text-xs text-ink-400 mb-2">
+                              <Activity className="w-3.5 h-3.5" />
+                              <span className="font-medium">音位偏差记录</span>
+                            </div>
+                            <div className="bg-white rounded-lg border border-clay-200 p-3">
+                              <PhonemeDeviationTable
+                                mode="view"
+                                deviations={tuning.phonemeDeviations}
+                                noteCount={tuning.phonemeDeviations.length}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {tuning.deviationNote && (
+                          <div className="bg-clay-50 rounded-lg p-3 border border-clay-100">
+                            <div className="flex items-center gap-1.5 text-xs text-ink-400 mb-1.5">
+                              <FileText className="w-3.5 h-3.5" />
+                              <span className="font-medium">偏音说明</span>
+                            </div>
+                            <p className="text-sm text-ink-600 leading-relaxed">
+                              {tuning.deviationNote}
+                            </p>
+                          </div>
+                        )}
+
+                        <p className="text-xs text-ink-300 mt-3">
+                          记录于 {formatDateTime(tuning.createdAt)}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

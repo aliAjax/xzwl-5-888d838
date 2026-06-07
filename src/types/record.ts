@@ -1,5 +1,13 @@
 export type DeliveryStatus = 'pending' | 'in-progress' | 'completed' | 'delivered';
 
+export interface PhonemeDeviation {
+  name: string;
+  beforeDeviation: number | null;
+  afterDeviation: number | null;
+  remark: string;
+}
+
+
 export interface TuningRecord {
   id: string;
   date: string;
@@ -8,6 +16,7 @@ export interface TuningRecord {
   afterStatus: string;
   remark: string;
   createdAt: string;
+  phonemeDeviations?: PhonemeDeviation[];
 }
 
 export interface HandpanRecord {
@@ -20,8 +29,10 @@ export interface HandpanRecord {
   customerNickname: string;
   deliveryStatus: DeliveryStatus;
   createdAt: string;
+  phonemeDeviations?: PhonemeDeviation[];
   updatedAt: string;
   tuningHistory: TuningRecord[];
+  phonemeNames?: string[];
 }
 
 export interface FilterState {
@@ -44,6 +55,7 @@ export interface ModeOption {
   active: boolean;
   sortOrder: number;
   createdAt: string;
+  phonemeDeviations?: PhonemeDeviation[];
   updatedAt: string;
 }
 
@@ -130,6 +142,7 @@ export interface WorkbenchTask {
   taskDate: string;
   sortOrder: number;
   createdAt: string;
+  phonemeDeviations?: PhonemeDeviation[];
   updatedAt: string;
 }
 
@@ -235,5 +248,47 @@ export const calculateReminders = (records: HandpanRecord[]): ReminderResult[] =
       count: recentlyCompleted.length,
     },
   ];
+};
+
+
+export const getMaxDeviation = (tuning: TuningRecord): number | null => {
+  if (!tuning.phonemeDeviations || tuning.phonemeDeviations.length === 0) {
+    return null;
+  }
+  const deviations = tuning.phonemeDeviations
+    .map(d => Math.abs(d.afterDeviation ?? d.beforeDeviation ?? 0))
+    .filter(v => v > 0);
+  return deviations.length > 0 ? Math.max(...deviations) : null;
+};
+
+export const getCalibratedCount = (tuning: TuningRecord): number => {
+  if (!tuning.phonemeDeviations || tuning.phonemeDeviations.length === 0) {
+    return 0;
+  }
+  return tuning.phonemeDeviations.filter(d => 
+    d.beforeDeviation !== null && 
+    d.afterDeviation !== null && 
+    d.beforeDeviation !== d.afterDeviation
+  ).length;
+};
+
+export const getPhonemeNames = (record: HandpanRecord, noteCount: number): string[] => {
+  if (record.phonemeNames && record.phonemeNames.length === noteCount) {
+    return record.phonemeNames;
+  }
+  const names: string[] = ["Ding"];
+  for (let i = 1; i < noteCount; i++) {
+    names.push("音位 " + i);
+  }
+  return names;
+};
+
+export const createEmptyPhonemeDeviations = (names: string[]): PhonemeDeviation[] => {
+  return names.map(name => ({
+    name,
+    beforeDeviation: null,
+    afterDeviation: null,
+    remark: "",
+  }));
 };
 

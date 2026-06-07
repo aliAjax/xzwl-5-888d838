@@ -1,4 +1,4 @@
-import type { HandpanRecord, TuningRecord } from '@/types/record';
+import type { HandpanRecord, TuningRecord, PhonemeDeviation } from '@/types/record';
 
 const STORAGE_KEY = 'handpan_records';
 
@@ -14,7 +14,15 @@ export const migrateRecord = (record: any): HandpanRecord => {
   const migrated: HandpanRecord = {
     ...record,
     tuningHistory: record.tuningHistory || [],
+    phonemeNames: record.phonemeNames !== undefined ? record.phonemeNames : undefined,
   };
+
+  if (migrated.tuningHistory.length > 0) {
+    migrated.tuningHistory = migrated.tuningHistory.map((tuning: any) => ({
+      ...tuning,
+      phonemeDeviations: tuning.phonemeDeviations !== undefined ? tuning.phonemeDeviations : undefined,
+    }));
+  }
 
   if (migrated.tuningHistory.length === 0 && (record.lastTuningDate || record.deviationNote)) {
     const initialTuning: TuningRecord = {
@@ -25,6 +33,7 @@ export const migrateRecord = (record: any): HandpanRecord => {
       afterStatus: '',
       remark: '历史数据迁移',
       createdAt: record.updatedAt || record.createdAt || new Date().toISOString(),
+      phonemeDeviations: record.phonemeDeviations !== undefined ? record.phonemeDeviations : undefined,
     };
     migrated.tuningHistory = [initialTuning];
   }
@@ -71,13 +80,14 @@ export const addRecord = (record: Omit<HandpanRecord, 'id' | 'createdAt' | 'upda
     createdAt: now,
     updatedAt: now,
     tuningHistory: [initialTuning],
+    phonemeNames: record.phonemeNames,
   };
   records.push(newRecord);
   saveRecords(records);
   return newRecord;
 };
 
-export const addTuningRecord = (recordId: string, tuning: Omit<TuningRecord, 'id' | 'createdAt'>): HandpanRecord | null => {
+export const addTuningRecord = (recordId: string, tuning: Omit<TuningRecord, 'id' | 'createdAt'> & { phonemeDeviations?: PhonemeDeviation[] }): HandpanRecord | null => {
   const records = getRecords();
   const index = records.findIndex(r => r.id === recordId);
   if (index === -1) return null;
@@ -87,6 +97,7 @@ export const addTuningRecord = (recordId: string, tuning: Omit<TuningRecord, 'id
     ...tuning,
     id: generateTuningId(),
     createdAt: now,
+    phonemeDeviations: tuning.phonemeDeviations,
   };
 
   records[index] = {
@@ -156,7 +167,7 @@ const REQUIRED_FIELDS: (keyof HandpanRecord)[] = [
   'deliveryStatus',
 ];
 
-export const createInitialTuningHistory = (record: Partial<HandpanRecord>): TuningRecord[] => {
+export const createInitialTuningHistory = (record: Partial<HandpanRecord>, phonemeDeviations?: PhonemeDeviation[]): TuningRecord[] => {
   const now = new Date().toISOString();
   return [{
     id: generateTuningId(),
@@ -166,6 +177,7 @@ export const createInitialTuningHistory = (record: Partial<HandpanRecord>): Tuni
     afterStatus: '',
     remark: '导入数据',
     createdAt: now,
+    phonemeDeviations,
   }];
 };
 
@@ -248,7 +260,7 @@ export const mergeImportedRecords = (
       updatedAt: now,
       tuningHistory: migrated.tuningHistory?.length > 0 
         ? migrated.tuningHistory 
-        : createInitialTuningHistory(migrated),
+        : createInitialTuningHistory(migrated, (record as any).phonemeDeviations),
     };
   });
   

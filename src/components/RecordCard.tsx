@@ -1,6 +1,7 @@
 import { Edit2, Trash2, Calendar, User, Hash, FileText, History, Clock } from 'lucide-react';
 import type { HandpanRecord } from '@/types/record';
-import { getStatusLabel, getStatusColor, getLatestTuning, getLatestTuningDate, getLatestDeviationNote } from '@/types/record';
+// @ts-ignore
+import { getStatusLabel, getStatusColor, getLatestTuning, getLatestTuningDate, getLatestDeviationNote, getMaxDeviation, getCalibratedCount } from '@/types/record';
 
 interface RecordCardProps {
   record: HandpanRecord;
