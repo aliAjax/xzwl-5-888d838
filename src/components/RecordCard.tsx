@@ -10,9 +10,10 @@ interface RecordCardProps {
   onViewDetail: (record: HandpanRecord) => void;
   index: number;
   showDeliveryButton?: boolean;
+  readOnly?: boolean;
 }
 
-export function RecordCard({ record, onEdit, onDelete, onGenerateDelivery, onViewDetail, index, showDeliveryButton = true }: RecordCardProps) {
+export function RecordCard({ record, onEdit, onDelete, onGenerateDelivery, onViewDetail, index, showDeliveryButton = true, readOnly = false }: RecordCardProps) {
   const handleDelete = () => {
     if (confirm(`确定要删除记录 "${record.serialNumber}" 吗？`)) {
       onDelete(record.id);
@@ -99,8 +100,13 @@ export function RecordCard({ record, onEdit, onDelete, onGenerateDelivery, onVie
 
       <div className="flex items-center pt-3 border-t border-clay-100 justify-between">
         <button
-          onClick={() => onViewDetail(record)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-clay-600 hover:text-clay-700 hover:bg-clay-50 transition-all"
+          onClick={() => !readOnly && onViewDetail(record)}
+          disabled={readOnly}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all ${
+            readOnly 
+              ? 'text-ink-300 cursor-not-allowed' 
+              : 'text-clay-600 hover:text-clay-700 hover:bg-clay-50'
+          }`}
           title="查看调音历史"
         >
           <Clock className="w-4 h-4" />
@@ -109,23 +115,38 @@ export function RecordCard({ record, onEdit, onDelete, onGenerateDelivery, onVie
         <div className="flex items-center gap-2">
           {showDeliveryButton && (
             <button
-              onClick={() => onGenerateDelivery(record)}
-              className="p-2 rounded-lg text-ink-400 hover:text-brass-600 hover:bg-brass-50 transition-all"
+              onClick={() => !readOnly && onGenerateDelivery(record)}
+              disabled={readOnly}
+              className={`p-2 rounded-lg transition-all ${
+                readOnly 
+                  ? 'text-ink-200 cursor-not-allowed' 
+                  : 'text-ink-400 hover:text-brass-600 hover:bg-brass-50'
+              }`}
               title="生成交付单"
             >
               <FileText className="w-4 h-4" />
             </button>
           )}
           <button
-            onClick={() => onEdit(record)}
-            className="p-2 rounded-lg text-ink-400 hover:text-clay-500 hover:bg-clay-50 transition-all"
+            onClick={() => !readOnly && onEdit(record)}
+            disabled={readOnly}
+            className={`p-2 rounded-lg transition-all ${
+              readOnly 
+                ? 'text-ink-200 cursor-not-allowed' 
+                : 'text-ink-400 hover:text-clay-500 hover:bg-clay-50'
+            }`}
             title="编辑"
           >
             <Edit2 className="w-4 h-4" />
           </button>
           <button
-            onClick={handleDelete}
-            className="p-2 rounded-lg text-ink-400 hover:text-red-500 hover:bg-red-50 transition-all"
+            onClick={() => !readOnly && handleDelete()}
+            disabled={readOnly}
+            className={`p-2 rounded-lg transition-all ${
+              readOnly 
+                ? 'text-ink-200 cursor-not-allowed' 
+                : 'text-ink-400 hover:text-red-500 hover:bg-red-50'
+            }`}
             title="删除"
           >
             <Trash2 className="w-4 h-4" />

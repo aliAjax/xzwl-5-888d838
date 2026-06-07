@@ -141,6 +141,7 @@ export function ImportPreview({ isOpen, onClose, onConfirm, analysis, fileName }
                       onViewDetail={() => {}}
                       index={index}
                       showDeliveryButton={false}
+                      readOnly={true}
                     />
                   ))}
                 </div>
