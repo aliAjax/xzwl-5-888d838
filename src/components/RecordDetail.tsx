@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Plus, Calendar, FileText, ArrowRight, Music, Hash, User, Tag, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
 import type { HandpanRecord, TuningRecord } from '@/types/record';
-import { getStatusLabel, getStatusColor, getLatestTuning } from '@/types/record';
+import { compareTuningRecords, getStatusLabel, getStatusColor, getLatestTuning } from '@/types/record';
 
 interface RecordDetailProps {
   isOpen: boolean;
@@ -105,7 +105,7 @@ export function RecordDetail({ isOpen, onClose, record, onAddTuning }: RecordDet
   };
 
   const sortedHistory = record?.tuningHistory
-    ? [...record.tuningHistory].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    ? [...record.tuningHistory].sort((a, b) => compareTuningRecords(b, a))
     : [];
 
   if (!isOpen || !record) return null;

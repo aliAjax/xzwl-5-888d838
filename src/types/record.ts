@@ -129,12 +129,21 @@ export const getDaysDiff = (dateStr: string): number => {
   return diffDays;
 };
 
+export const compareTuningRecords = (a: TuningRecord, b: TuningRecord): number => {
+  const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
+  if (dateDiff !== 0) {
+    return dateDiff;
+  }
+
+  return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+};
+
 export const getLatestTuning = (record: HandpanRecord): TuningRecord | null => {
   if (!record.tuningHistory || record.tuningHistory.length === 0) {
     return null;
   }
   return record.tuningHistory.reduce((latest, current) => 
-    new Date(current.date) > new Date(latest.date) ? current : latest
+    compareTuningRecords(current, latest) > 0 ? current : latest
   );
 };
 
@@ -188,5 +197,4 @@ export const calculateReminders = (records: HandpanRecord[]): ReminderResult[] =
     },
   ];
 };
-
 

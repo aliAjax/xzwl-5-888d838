@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import type { HandpanRecord, DeliveryStatus, TuningRecord } from '@/types/record';
-import { DELIVERY_STATUS_OPTIONS } from '@/types/record';
+import { DELIVERY_STATUS_OPTIONS, getLatestTuning } from '@/types/record';
 import { generateId, generateTuningId } from '@/utils/storage';
 import { getModeOptionsForForm } from '@/utils/modeStorage';
 
@@ -105,6 +105,17 @@ export function RecordForm({ isOpen, onClose, onSave, editingRecord }: RecordFor
         createdAt: now,
       };
       tuningHistory = [initialTuning];
+    } else if (editingRecord) {
+      const latestTuning = getLatestTuning(editingRecord);
+      tuningHistory = tuningHistory.map(tuning =>
+        tuning.id === latestTuning?.id
+          ? {
+              ...tuning,
+              date: formData.lastTuningDate,
+              deviationNote: formData.deviationNote,
+            }
+          : tuning
+      );
     }
 
     const record: HandpanRecord = {
