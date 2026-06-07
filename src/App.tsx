@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import type { HandpanRecord, FilterState, TuningRecord } from '@/types/record';
+import type { HandpanRecord, FilterState, TuningRecord, DeliveryStatus } from '@/types/record';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Header } from '@/components/Header';
 import { FilterBar } from '@/components/FilterBar';
@@ -11,7 +11,9 @@ import { FloatingButton } from '@/components/FloatingButton';
 import { ImportPreview } from '@/components/ImportPreview';
 import { DeliveryOrder } from '@/components/DeliveryOrder';
 import { ModeManager } from '@/components/ModeManager';
+import { TuningWorkbench } from '@/components/TuningWorkbench';
 import { parseImportData, analyzeImportData, mergeImportedRecords, migrateRecords, generateTuningId, type ImportAnalysis } from '@/utils/storage';
+import { removeTasksByRecordId, cleanupInvalidTasks } from '@/utils/workbenchStorage';
 
 const STORAGE_KEY = 'handpan_records';
 
@@ -137,6 +139,7 @@ function App() {
   const [isDeliveryOpen, setIsDeliveryOpen] = useState(false);
   const [deliveryRecord, setDeliveryRecord] = useState<HandpanRecord | null>(null);
   const [isModeManagerOpen, setIsModeManagerOpen] = useState(false);
+  const [isWorkbenchOpen, setIsWorkbenchOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -225,6 +228,7 @@ function App() {
 
   const handleDelete = (id: string) => {
     setRecords(prev => prev.filter(r => r.id !== id));
+    removeTasksByRecordId(id);
   };
 
   const handleImportClick = () => {
@@ -271,6 +275,12 @@ function App() {
     const mergedRecords = mergeImportedRecords(records, importAnalysis.valid);
     setRecords(mergedRecords);
     
+    setTimeout(() => {
+      const validIds = mergedRecords.map(r => r.id);
+      const deliveredIds = mergedRecords.filter(r => r.deliveryStatus === 'delivered').map(r => r.id);
+      cleanupInvalidTasks(validIds, deliveredIds);
+    }, 0);
+    
     alert(`成功导入 ${importAnalysis.valid.length} 条记录`);
     handleCloseImport();
   };
@@ -293,6 +303,31 @@ function App() {
     setIsModeManagerOpen(false);
   };
 
+  const handleOpenWorkbench = () => {
+    setIsWorkbenchOpen(true);
+  };
+
+  const handleCloseWorkbench = () => {
+    setIsWorkbenchOpen(false);
+  };
+
+  const handleUpdateRecordStatus = (recordId: string, status: DeliveryStatus) => {
+    setRecords(prev => 
+      prev.map(r => r.id === recordId ? { ...r, deliveryStatus: status, updatedAt: new Date().toISOString() } : r)
+    );
+    if (detailRecord && detailRecord.id === recordId) {
+      setDetailRecord(prev => prev ? { ...prev, deliveryStatus: status, updatedAt: new Date().toISOString() } : null);
+    }
+  };
+
+  const handleOpenTuningHistoryFromWorkbench = (record: HandpanRecord) => {
+    setIsWorkbenchOpen(false);
+    setTimeout(() => {
+      setDetailRecord(record);
+      setIsDetailOpen(true);
+    }, 300);
+  };
+
   return (
     <div className="min-h-screen pb-8">
       <input
@@ -303,7 +338,7 @@ function App() {
         className="hidden"
       />
       <Header onImportClick={handleImportClick} onModeManagerClick={handleOpenModeManager} />
-      <FilterBar filters={filters} onFilterChange={setFilters} records={records} />
+      <FilterBar filters={filters} onFilterChange={setFilters} records={records} onOpenWorkbench={handleOpenWorkbench} />
       <TuningReminderBoard records={records} filters={filters} onFilterChange={setFilters} />
       <RecordList 
         records={records} 
@@ -341,6 +376,13 @@ function App() {
         onClose={handleCloseDetail}
         record={detailRecord}
         onAddTuning={handleAddTuning}
+      />
+      <TuningWorkbench
+        isOpen={isWorkbenchOpen}
+        onClose={handleCloseWorkbench}
+        records={records}
+        onViewTuningHistory={handleOpenTuningHistoryFromWorkbench}
+        onUpdateRecordStatus={handleUpdateRecordStatus}
       />
     </div>
   );

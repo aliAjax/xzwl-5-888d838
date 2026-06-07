@@ -1,4 +1,4 @@
-import { Filter, Search, X } from 'lucide-react';
+import { Filter, Search, X, ListTodo } from 'lucide-react';
 import type { FilterState, DeliveryStatus, HandpanRecord } from '@/types/record';
 import { DELIVERY_STATUS_OPTIONS } from '@/types/record';
 import { getModeOptionsForFilter } from '@/utils/modeStorage';
@@ -7,9 +7,10 @@ interface FilterBarProps {
   filters: FilterState;
   onFilterChange: (filters: FilterState) => void;
   records: HandpanRecord[];
+  onOpenWorkbench: () => void;
 }
 
-export function FilterBar({ filters, onFilterChange, records }: FilterBarProps) {
+export function FilterBar({ filters, onFilterChange, records, onOpenWorkbench }: FilterBarProps) {
   const modeOptions = getModeOptionsForFilter(records);
 
   const handleModeChange = (mode: string) => {
@@ -33,9 +34,20 @@ export function FilterBar({ filters, onFilterChange, records }: FilterBarProps) 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
       <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-4 sm:p-6 border border-clay-100 shadow-sm">
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
           <Filter className="w-5 h-5 text-clay-500" />
           <span className="font-semibold text-ink-500">筛选记录</span>
+          
+          <div className="mx-3 h-6 w-px bg-clay-200" />
+          
+          <button
+            onClick={onOpenWorkbench}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brass-500 text-white text-sm font-medium hover:bg-brass-600 transition-colors"
+          >
+            <ListTodo className="w-4 h-4" />
+            <span>调音工作台</span>
+          </button>
+          
           {hasActiveFilters && (
             <button
               onClick={handleClear}

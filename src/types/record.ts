@@ -121,6 +121,45 @@ export const REMINDER_CATEGORIES: ReminderCategory[] = [
   },
 ];
 
+export type WorkbenchTaskStatus = 'pending' | 'in-progress' | 'completed';
+
+export interface WorkbenchTask {
+  id: string;
+  recordId: string;
+  status: WorkbenchTaskStatus;
+  taskDate: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorkbenchData {
+  tasks: WorkbenchTask[];
+  currentDate: string;
+}
+
+export const WORKBENCH_STATUS_OPTIONS: { value: WorkbenchTaskStatus; label: string; color: string }[] = [
+  { value: 'pending', label: '待调音', color: 'bg-gray-100 text-gray-700 border-gray-300' },
+  { value: 'in-progress', label: '调音中', color: 'bg-blue-50 text-blue-700 border-blue-300' },
+  { value: 'completed', label: '已完成待复查', color: 'bg-amber-50 text-amber-700 border-amber-300' },
+];
+
+export const getWorkbenchStatusLabel = (status: WorkbenchTaskStatus): string => {
+  const option = WORKBENCH_STATUS_OPTIONS.find(opt => opt.value === status);
+  return option ? option.label : status;
+};
+
+export const getWorkbenchStatusColor = (status: WorkbenchTaskStatus): string => {
+  const option = WORKBENCH_STATUS_OPTIONS.find(opt => opt.value === status);
+  return option ? option.color : 'bg-gray-100 text-gray-700';
+};
+
+export const getNextWorkbenchStatus = (status: WorkbenchTaskStatus): WorkbenchTaskStatus | null => {
+  const flow: WorkbenchTaskStatus[] = ['pending', 'in-progress', 'completed'];
+  const currentIndex = flow.indexOf(status);
+  return currentIndex < flow.length - 1 ? flow[currentIndex + 1] : null;
+};
+
 export const getDaysDiff = (dateStr: string): number => {
   const date = new Date(dateStr);
   const now = new Date();
