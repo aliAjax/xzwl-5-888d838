@@ -3,7 +3,7 @@ import { X } from 'lucide-react';
 import type { HandpanRecord, DeliveryStatus } from '@/types/record';
 import { DELIVERY_STATUS_OPTIONS } from '@/types/record';
 import { generateId } from '@/utils/storage';
-import { getModeOptionsForForm, getAllModeNames } from '@/utils/modeStorage';
+import { getModeOptionsForForm } from '@/utils/modeStorage';
 
 interface RecordFormProps {
   isOpen: boolean;

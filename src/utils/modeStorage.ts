@@ -127,7 +127,6 @@ export const getModeOptionsForForm = (): string[] => {
 
 export const getModeOptionsForFilter = (records: HandpanRecord[]): { value: string; label: string; disabled: boolean }[] => {
   const modes = getModes();
-  const activeModeNames = new Set(getActiveModeNames());
   const usedModeNames = new Set(getUsedModeNames(records));
 
   const sortedModes = [...modes].sort((a, b) => a.sortOrder - b.sortOrder);
@@ -154,6 +153,6 @@ export const getModeOptionsForFilter = (records: HandpanRecord[]): { value: stri
   return result;
 };
 
-export const getDisplayModeName = (modeName: string, records?: HandpanRecord[]): string => {
+export const getDisplayModeName = (modeName: string): string => {
   return modeName;
 };
