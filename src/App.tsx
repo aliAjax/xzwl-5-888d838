@@ -8,6 +8,7 @@ import { RecordList } from '@/components/RecordList';
 import { RecordForm } from '@/components/RecordForm';
 import { FloatingButton } from '@/components/FloatingButton';
 import { ImportPreview } from '@/components/ImportPreview';
+import { DeliveryOrder } from '@/components/DeliveryOrder';
 import { parseImportData, analyzeImportData, mergeImportedRecords, type ImportAnalysis } from '@/utils/storage';
 
 const STORAGE_KEY = 'handpan_records';
@@ -100,6 +101,8 @@ function App() {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [importAnalysis, setImportAnalysis] = useState<ImportAnalysis | null>(null);
   const [importFileName, setImportFileName] = useState('');
+  const [isDeliveryOpen, setIsDeliveryOpen] = useState(false);
+  const [deliveryRecord, setDeliveryRecord] = useState<HandpanRecord | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleOpenAdd = () => {
@@ -179,6 +182,16 @@ function App() {
     handleCloseImport();
   };
 
+  const handleOpenDelivery = (record: HandpanRecord) => {
+    setDeliveryRecord(record);
+    setIsDeliveryOpen(true);
+  };
+
+  const handleCloseDelivery = () => {
+    setIsDeliveryOpen(false);
+    setDeliveryRecord(null);
+  };
+
   return (
     <div className="min-h-screen pb-8">
       <input
@@ -195,7 +208,8 @@ function App() {
         records={records} 
         filters={filters} 
         onEdit={handleOpenEdit} 
-        onDelete={handleDelete} 
+        onDelete={handleDelete}
+        onGenerateDelivery={handleOpenDelivery}
       />
       <FloatingButton onClick={handleOpenAdd} />
       <RecordForm
@@ -210,6 +224,11 @@ function App() {
         onConfirm={handleConfirmImport}
         analysis={importAnalysis}
         fileName={importFileName}
+      />
+      <DeliveryOrder
+        isOpen={isDeliveryOpen}
+        onClose={handleCloseDelivery}
+        record={deliveryRecord}
       />
     </div>
   );

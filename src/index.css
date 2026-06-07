@@ -83,3 +83,170 @@
     display: none;
   }
 }
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .delivery-order-content,
+  .delivery-order-content * {
+    visibility: visible;
+  }
+
+  .delivery-order-content {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+    border-radius: 0;
+    background: white !important;
+  }
+
+  .no-print,
+  .no-print * {
+    display: none !important;
+  }
+
+  @page {
+    size: A4;
+    margin: 2cm;
+  }
+
+  .delivery-order-content .bg-gradient-to-r {
+    background: linear-gradient(to right, #8B5A2B, #B8860B) !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .delivery-order-content .bg-clay-50 {
+    background-color: #F5F0E8 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .delivery-order-content .bg-brass-50 {
+    background-color: #FBF5E5 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .delivery-order-content .bg-ink-50 {
+    background-color: #F0F2F5 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .delivery-order-content .border-clay-100,
+  .delivery-order-content .border-ink-100,
+  .delivery-order-content .border-ink-300 {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .delivery-order-content .text-white {
+    color: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .delivery-order-content .text-ink-500 {
+    color: #2C3E50 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .delivery-order-content .text-ink-400 {
+    color: #5F7085 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .delivery-order-content .text-ink-300 {
+    color: #8A96A8 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .delivery-order-content .text-brass-600 {
+    color: #9A6E08 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .delivery-order-content .bg-brass-500 {
+    background-color: #B8860B !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .delivery-order-content .bg-clay-500 {
+    background-color: #8B5A2B !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .delivery-order-content .bg-gray-100 {
+    background-color: #F3F4F6 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .delivery-order-content .text-gray-700 {
+    color: #374151 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .delivery-order-content .border-gray-300 {
+    border-color: #D1D5DB !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .delivery-order-content .bg-blue-50 {
+    background-color: #EFF6FF !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .delivery-order-content .text-blue-700 {
+    color: #1D4ED8 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .delivery-order-content .border-blue-300 {
+    border-color: #93C5FD !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .delivery-order-content .bg-green-50 {
+    background-color: #F0FDF4 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .delivery-order-content .text-green-700 {
+    color: #15803D !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .delivery-order-content .border-green-300 {
+    border-color: #86EFAC !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .delivery-order-content .border-brass-400 {
+    border-color: #D4AE3C !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

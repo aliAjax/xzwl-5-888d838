@@ -8,9 +8,10 @@ interface RecordListProps {
   filters: FilterState;
   onEdit: (record: HandpanRecord) => void;
   onDelete: (id: string) => void;
+  onGenerateDelivery: (record: HandpanRecord) => void;
 }
 
-export function RecordList({ records, filters, onEdit, onDelete }: RecordListProps) {
+export function RecordList({ records, filters, onEdit, onDelete, onGenerateDelivery }: RecordListProps) {
   const filteredRecords = records.filter((record) => {
     const matchesMode = !filters.mode || record.mode === filters.mode;
     const matchesStatus = !filters.deliveryStatus || record.deliveryStatus === filters.deliveryStatus;
@@ -86,6 +87,7 @@ export function RecordList({ records, filters, onEdit, onDelete }: RecordListPro
             record={record}
             onEdit={onEdit}
             onDelete={onDelete}
+            onGenerateDelivery={onGenerateDelivery}
             index={index}
           />
         ))}

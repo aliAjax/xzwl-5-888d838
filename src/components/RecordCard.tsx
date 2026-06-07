@@ -1,4 +1,4 @@
-import { Edit2, Trash2, Calendar, User, Hash } from 'lucide-react';
+import { Edit2, Trash2, Calendar, User, Hash, FileText } from 'lucide-react';
 import type { HandpanRecord } from '@/types/record';
 import { getStatusLabel, getStatusColor } from '@/types/record';
 
@@ -6,10 +6,11 @@ interface RecordCardProps {
   record: HandpanRecord;
   onEdit: (record: HandpanRecord) => void;
   onDelete: (id: string) => void;
+  onGenerateDelivery: (record: HandpanRecord) => void;
   index: number;
 }
 
-export function RecordCard({ record, onEdit, onDelete, index }: RecordCardProps) {
+export function RecordCard({ record, onEdit, onDelete, onGenerateDelivery, index }: RecordCardProps) {
   const handleDelete = () => {
     if (confirm(`确定要删除记录 "${record.serialNumber}" 吗？`)) {
       onDelete(record.id);
@@ -72,21 +73,31 @@ export function RecordCard({ record, onEdit, onDelete, index }: RecordCardProps)
         </div>
       )}
 
-      <div className="flex items-center justify-end gap-2 pt-3 border-t border-clay-100">
+      <div className="flex items-center justify-between pt-3 border-t border-clay-100">
         <button
-          onClick={() => onEdit(record)}
-          className="p-2 rounded-lg text-ink-400 hover:text-clay-500 hover:bg-clay-50 transition-all"
-          title="编辑"
+          onClick={() => onGenerateDelivery(record)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-brass-600 hover:text-brass-700 hover:bg-brass-50 transition-all"
+          title="生成交付单"
         >
-          <Edit2 className="w-4 h-4" />
+          <FileText className="w-4 h-4" />
+          <span>交付单</span>
         </button>
-        <button
-          onClick={handleDelete}
-          className="p-2 rounded-lg text-ink-400 hover:text-red-500 hover:bg-red-50 transition-all"
-          title="删除"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => onEdit(record)}
+            className="p-2 rounded-lg text-ink-400 hover:text-clay-500 hover:bg-clay-50 transition-all"
+            title="编辑"
+          >
+            <Edit2 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={handleDelete}
+            className="p-2 rounded-lg text-ink-400 hover:text-red-500 hover:bg-red-50 transition-all"
+            title="删除"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
       </div>
     </div>
   );

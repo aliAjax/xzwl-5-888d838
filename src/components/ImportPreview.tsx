@@ -24,6 +24,7 @@ export function ImportPreview({ isOpen, onClose, onConfirm, analysis, fileName }
 
   const handleEdit = () => {};
   const handleDelete = () => {};
+  const handleGenerateDelivery = () => {};
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -136,6 +137,7 @@ export function ImportPreview({ isOpen, onClose, onConfirm, analysis, fileName }
                       record={record}
                       onEdit={handleEdit}
                       onDelete={handleDelete}
+                      onGenerateDelivery={handleGenerateDelivery}
                       index={index}
                     />
                   ))}
