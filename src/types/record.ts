@@ -1,5 +1,15 @@
 export type DeliveryStatus = 'pending' | 'in-progress' | 'completed' | 'delivered';
 
+export interface TuningRecord {
+  id: string;
+  date: string;
+  deviationNote: string;
+  beforeStatus: string;
+  afterStatus: string;
+  remark: string;
+  createdAt: string;
+}
+
 export interface HandpanRecord {
   id: string;
   serialNumber: string;
@@ -11,6 +21,7 @@ export interface HandpanRecord {
   deliveryStatus: DeliveryStatus;
   createdAt: string;
   updatedAt: string;
+  tuningHistory: TuningRecord[];
 }
 
 export interface FilterState {
@@ -118,13 +129,33 @@ export const getDaysDiff = (dateStr: string): number => {
   return diffDays;
 };
 
+export const getLatestTuning = (record: HandpanRecord): TuningRecord | null => {
+  if (!record.tuningHistory || record.tuningHistory.length === 0) {
+    return null;
+  }
+  return record.tuningHistory.reduce((latest, current) => 
+    new Date(current.date) > new Date(latest.date) ? current : latest
+  );
+};
+
+export const getLatestTuningDate = (record: HandpanRecord): string => {
+  const latest = getLatestTuning(record);
+  return latest ? latest.date : record.lastTuningDate;
+};
+
+export const getLatestDeviationNote = (record: HandpanRecord): string => {
+  const latest = getLatestTuning(record);
+  return latest ? latest.deviationNote : record.deviationNote;
+};
+
 export const calculateReminders = (records: HandpanRecord[]): ReminderResult[] => {
   const pendingReview: HandpanRecord[] = [];
   const upcomingDue: HandpanRecord[] = [];
   const recentlyCompleted: HandpanRecord[] = [];
 
   records.forEach((record) => {
-    const daysSinceTuning = getDaysDiff(record.lastTuningDate);
+    const latestTuningDate = getLatestTuningDate(record);
+    const daysSinceTuning = getDaysDiff(latestTuningDate);
 
     if (record.deliveryStatus === 'completed') {
       pendingReview.push(record);

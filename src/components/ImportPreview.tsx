@@ -138,6 +138,7 @@ export function ImportPreview({ isOpen, onClose, onConfirm, analysis, fileName }
                       onEdit={handleEdit}
                       onDelete={handleDelete}
                       onGenerateDelivery={handleGenerateDelivery}
+                      onViewDetail={() => {}}
                       index={index}
                       showDeliveryButton={false}
                     />

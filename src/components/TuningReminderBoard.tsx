@@ -1,6 +1,6 @@
 import { AlertCircle, Clock, CheckCircle2, Bell } from 'lucide-react';
 import type { HandpanRecord, FilterState, ReminderType } from '@/types/record';
-import { calculateReminders, getDaysDiff } from '@/types/record';
+import { calculateReminders, getDaysDiff, getLatestTuningDate } from '@/types/record';
 
 interface TuningReminderBoardProps {
   records: HandpanRecord[];
@@ -101,7 +101,8 @@ export function TuningReminderBoard({ records, filters, onFilterChange }: Tuning
                   {reminder.count > 0 && (
                     <div className="flex flex-wrap gap-1 mt-2">
                       {reminder.records.slice(0, 3).map((record) => {
-                        const days = getDaysDiff(record.lastTuningDate);
+                        const latestTuningDate = getLatestTuningDate(record);
+                        const days = getDaysDiff(latestTuningDate);
                         return (
                           <span
                             key={record.id}

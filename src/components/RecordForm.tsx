@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import type { HandpanRecord, DeliveryStatus } from '@/types/record';
+import type { HandpanRecord, DeliveryStatus, TuningRecord } from '@/types/record';
 import { DELIVERY_STATUS_OPTIONS } from '@/types/record';
-import { generateId } from '@/utils/storage';
+import { generateId, generateTuningId } from '@/utils/storage';
 import { getModeOptionsForForm } from '@/utils/modeStorage';
 
 interface RecordFormProps {
@@ -14,7 +14,7 @@ interface RecordFormProps {
 
 export function RecordForm({ isOpen, onClose, onSave, editingRecord }: RecordFormProps) {
   const [modeOptions, setModeOptions] = useState<string[]>([]);
-  const [formData, setFormData] = useState<Omit<HandpanRecord, 'id' | 'createdAt' | 'updatedAt'>>({
+  const [formData, setFormData] = useState<Omit<HandpanRecord, 'id' | 'createdAt' | 'updatedAt' | 'tuningHistory'>>({
     serialNumber: '',
     mode: '',
     noteCount: 9,
@@ -92,18 +92,34 @@ export function RecordForm({ isOpen, onClose, onSave, editingRecord }: RecordFor
     if (!validate()) return;
 
     const now = new Date().toISOString();
+    let tuningHistory: TuningRecord[] = editingRecord?.tuningHistory || [];
+
+    if (tuningHistory.length === 0) {
+      const initialTuning: TuningRecord = {
+        id: generateTuningId(),
+        date: formData.lastTuningDate,
+        deviationNote: formData.deviationNote,
+        beforeStatus: '',
+        afterStatus: '',
+        remark: editingRecord ? '历史数据迁移' : '首次调音',
+        createdAt: now,
+      };
+      tuningHistory = [initialTuning];
+    }
+
     const record: HandpanRecord = {
       ...formData,
       id: editingRecord?.id || generateId(),
       createdAt: editingRecord?.createdAt || now,
       updatedAt: now,
+      tuningHistory,
     };
 
     onSave(record);
     onClose();
   };
 
-  const handleChange = (field: keyof typeof formData, value: string | number) => {
+  const handleChange = (field: keyof Omit<HandpanRecord, 'id' | 'createdAt' | 'updatedAt' | 'tuningHistory'>, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: undefined }));

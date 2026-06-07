@@ -1,6 +1,6 @@
 import { Music2 } from 'lucide-react';
 import type { HandpanRecord, FilterState } from '@/types/record';
-import { getDaysDiff } from '@/types/record';
+import { getDaysDiff, getLatestTuningDate } from '@/types/record';
 import { RecordCard } from './RecordCard';
 
 interface RecordListProps {
@@ -9,9 +9,10 @@ interface RecordListProps {
   onEdit: (record: HandpanRecord) => void;
   onDelete: (id: string) => void;
   onGenerateDelivery: (record: HandpanRecord) => void;
+  onViewDetail: (record: HandpanRecord) => void;
 }
 
-export function RecordList({ records, filters, onEdit, onDelete, onGenerateDelivery }: RecordListProps) {
+export function RecordList({ records, filters, onEdit, onDelete, onGenerateDelivery, onViewDetail }: RecordListProps) {
   const filteredRecords = records.filter((record) => {
     const matchesMode = !filters.mode || record.mode === filters.mode;
     const matchesStatus = !filters.deliveryStatus || record.deliveryStatus === filters.deliveryStatus;
@@ -22,7 +23,8 @@ export function RecordList({ records, filters, onEdit, onDelete, onGenerateDeliv
     
     let matchesReminder = true;
     if (filters.reminderType) {
-      const daysSinceTuning = getDaysDiff(record.lastTuningDate);
+      const latestTuningDate = getLatestTuningDate(record);
+      const daysSinceTuning = getDaysDiff(latestTuningDate);
       switch (filters.reminderType) {
         case 'pending-review':
           matchesReminder = record.deliveryStatus === 'completed';
@@ -88,6 +90,7 @@ export function RecordList({ records, filters, onEdit, onDelete, onGenerateDeliv
             onEdit={onEdit}
             onDelete={onDelete}
             onGenerateDelivery={onGenerateDelivery}
+            onViewDetail={onViewDetail}
             index={index}
           />
         ))}

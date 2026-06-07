@@ -1,4 +1,4 @@
-import type { HandpanRecord } from '@/types/record';
+import type { HandpanRecord, TuningRecord } from '@/types/record';
 
 const STORAGE_KEY = 'handpan_records';
 
@@ -6,10 +6,42 @@ export const generateId = (): string => {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
 };
 
+export const generateTuningId = (): string => {
+  return 'tuning-' + Date.now().toString(36) + Math.random().toString(36).substr(2);
+};
+
+export const migrateRecord = (record: any): HandpanRecord => {
+  const migrated: HandpanRecord = {
+    ...record,
+    tuningHistory: record.tuningHistory || [],
+  };
+
+  if (migrated.tuningHistory.length === 0 && (record.lastTuningDate || record.deviationNote)) {
+    const initialTuning: TuningRecord = {
+      id: generateTuningId(),
+      date: record.lastTuningDate || new Date().toISOString().split('T')[0],
+      deviationNote: record.deviationNote || '',
+      beforeStatus: '',
+      afterStatus: '',
+      remark: '历史数据迁移',
+      createdAt: record.updatedAt || record.createdAt || new Date().toISOString(),
+    };
+    migrated.tuningHistory = [initialTuning];
+  }
+
+  return migrated;
+};
+
+export const migrateRecords = (records: any[]): HandpanRecord[] => {
+  return records.map(migrateRecord);
+};
+
 export const getRecords = (): HandpanRecord[] => {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
+    if (!data) return [];
+    const parsed = JSON.parse(data);
+    return migrateRecords(parsed);
   } catch {
     return [];
   }
@@ -19,18 +51,53 @@ export const saveRecords = (records: HandpanRecord[]): void => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
 };
 
-export const addRecord = (record: Omit<HandpanRecord, 'id' | 'createdAt' | 'updatedAt'>): HandpanRecord => {
+export const addRecord = (record: Omit<HandpanRecord, 'id' | 'createdAt' | 'updatedAt' | 'tuningHistory'>): HandpanRecord => {
   const records = getRecords();
   const now = new Date().toISOString();
+  
+  const initialTuning: TuningRecord = {
+    id: generateTuningId(),
+    date: record.lastTuningDate,
+    deviationNote: record.deviationNote,
+    beforeStatus: '',
+    afterStatus: '',
+    remark: '',
+    createdAt: now,
+  };
+
   const newRecord: HandpanRecord = {
     ...record,
     id: generateId(),
     createdAt: now,
     updatedAt: now,
+    tuningHistory: [initialTuning],
   };
   records.push(newRecord);
   saveRecords(records);
   return newRecord;
+};
+
+export const addTuningRecord = (recordId: string, tuning: Omit<TuningRecord, 'id' | 'createdAt'>): HandpanRecord | null => {
+  const records = getRecords();
+  const index = records.findIndex(r => r.id === recordId);
+  if (index === -1) return null;
+  
+  const now = new Date().toISOString();
+  const newTuning: TuningRecord = {
+    ...tuning,
+    id: generateTuningId(),
+    createdAt: now,
+  };
+
+  records[index] = {
+    ...records[index],
+    lastTuningDate: tuning.date,
+    deviationNote: tuning.deviationNote,
+    tuningHistory: [...records[index].tuningHistory, newTuning],
+    updatedAt: now,
+  };
+  saveRecords(records);
+  return records[index];
 };
 
 export const updateRecord = (id: string, updates: Partial<HandpanRecord>): HandpanRecord | null => {
@@ -88,6 +155,19 @@ const REQUIRED_FIELDS: (keyof HandpanRecord)[] = [
   'customerNickname',
   'deliveryStatus',
 ];
+
+export const createInitialTuningHistory = (record: Partial<HandpanRecord>): TuningRecord[] => {
+  const now = new Date().toISOString();
+  return [{
+    id: generateTuningId(),
+    date: record.lastTuningDate || new Date().toISOString().split('T')[0],
+    deviationNote: record.deviationNote || '',
+    beforeStatus: '',
+    afterStatus: '',
+    remark: '导入数据',
+    createdAt: now,
+  }];
+};
 
 export const validateRecord = (record: Partial<HandpanRecord>): { valid: boolean; missingFields: string[] } => {
   const missingFields: string[] = [];
@@ -159,12 +239,18 @@ export const mergeImportedRecords = (
   validImportedRecords: HandpanRecord[]
 ): HandpanRecord[] => {
   const now = new Date().toISOString();
-  const newRecords = validImportedRecords.map(record => ({
-    ...record,
-    id: record.id || generateId(),
-    createdAt: record.createdAt || now,
-    updatedAt: now,
-  }));
+  const newRecords = validImportedRecords.map(record => {
+    const migrated = migrateRecord(record);
+    return {
+      ...migrated,
+      id: migrated.id || generateId(),
+      createdAt: migrated.createdAt || now,
+      updatedAt: now,
+      tuningHistory: migrated.tuningHistory?.length > 0 
+        ? migrated.tuningHistory 
+        : createInitialTuningHistory(migrated),
+    };
+  });
   
   return [...existingRecords, ...newRecords];
 };

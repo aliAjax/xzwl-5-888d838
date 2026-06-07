@@ -1,6 +1,6 @@
 import { X, Printer, Music2 } from 'lucide-react';
 import type { HandpanRecord } from '@/types/record';
-import { getStatusLabel, getStatusColor } from '@/types/record';
+import { getStatusLabel, getStatusColor, getLatestTuningDate, getLatestDeviationNote, getLatestTuning } from '@/types/record';
 
 interface DeliveryOrderProps {
   isOpen: boolean;
@@ -10,6 +10,10 @@ interface DeliveryOrderProps {
 
 export function DeliveryOrder({ isOpen, onClose, record }: DeliveryOrderProps) {
   if (!isOpen || !record) return null;
+
+  const latestTuningDate = getLatestTuningDate(record);
+  const latestDeviationNote = getLatestDeviationNote(record);
+  const latestTuning = getLatestTuning(record);
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('zh-CN', {
@@ -76,7 +80,7 @@ export function DeliveryOrder({ isOpen, onClose, record }: DeliveryOrderProps) {
               </div>
               <div className="text-right">
                 <p className="text-xs text-ink-400 uppercase tracking-wider mb-1">交付日期</p>
-                <p className="text-lg font-semibold text-ink-500">{formatDateShort(record.lastTuningDate)}</p>
+                <p className="text-lg font-semibold text-ink-500">{formatDateShort(latestTuningDate)}</p>
               </div>
             </div>
 
@@ -95,7 +99,7 @@ export function DeliveryOrder({ isOpen, onClose, record }: DeliveryOrderProps) {
               </div>
               <div className="bg-brass-50 rounded-xl p-5">
                 <p className="text-xs text-ink-400 uppercase tracking-wider mb-2">最近调音日期</p>
-                <p className="text-xl font-semibold text-ink-500">{formatDate(record.lastTuningDate)}</p>
+                <p className="text-xl font-semibold text-ink-500">{formatDate(latestTuningDate)}</p>
               </div>
             </div>
 
@@ -106,11 +110,33 @@ export function DeliveryOrder({ isOpen, onClose, record }: DeliveryOrderProps) {
               </span>
             </div>
 
+            {latestTuning?.beforeStatus && (
+              <div className="space-y-3 pt-2">
+                <p className="text-xs text-ink-400 uppercase tracking-wider">调音前状态</p>
+                <div className="bg-amber-50 rounded-xl p-5 border border-amber-100">
+                  <p className="text-amber-800 leading-relaxed whitespace-pre-wrap">
+                    {latestTuning.beforeStatus}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {latestTuning?.afterStatus && (
+              <div className="space-y-3 pt-2">
+                <p className="text-xs text-ink-400 uppercase tracking-wider">调音后状态</p>
+                <div className="bg-green-50 rounded-xl p-5 border border-green-100">
+                  <p className="text-green-800 leading-relaxed whitespace-pre-wrap">
+                    {latestTuning.afterStatus}
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-3 pt-2">
               <p className="text-xs text-ink-400 uppercase tracking-wider">偏音说明</p>
               <div className="bg-ink-50 rounded-xl p-5 border border-ink-100">
                 <p className="text-ink-500 leading-relaxed whitespace-pre-wrap">
-                  {record.deviationNote || <span className="text-ink-300">无</span>}
+                  {latestDeviationNote || <span className="text-ink-300">无</span>}
                 </p>
               </div>
             </div>
