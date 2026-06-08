@@ -259,6 +259,45 @@ export interface MergeResult {
   diffs: DiffItem[];
 }
 
+export type ImportModuleType = 'records' | 'modes' | 'workbenchTasks' | 'tombstones';
+
+export const IMPORT_MODULE_LABELS: Record<ImportModuleType, string> = {
+  records: '调音记录',
+  modes: '调式管理',
+  workbenchTasks: '工作台任务',
+  tombstones: '删除墓碑',
+};
+
+export interface ImportModuleOptions {
+  records: boolean;
+  modes: boolean;
+  workbenchTasks: boolean;
+  tombstones: boolean;
+}
+
+export interface ModuleStats {
+  moduleType: ImportModuleType;
+  total: number;
+  added: number;
+  modified: number;
+  deleted: number;
+  conflict: number;
+  unchanged: number;
+}
+
+export interface ImportPreviewResult {
+  moduleStats: ModuleStats[];
+  diffs: DiffItem[];
+  importedBackup: VersionedBackup;
+  localData: {
+    records: HandpanRecord[];
+    modes: ModeOption[];
+    workbenchTasks: WorkbenchTask[];
+    tombstones: Tombstone[];
+  };
+  warnings: string[];
+}
+
 export const WORKBENCH_STATUS_OPTIONS: { value: WorkbenchTaskStatus; label: string; color: string }[] = [
   { value: 'pending', label: '待调音', color: 'bg-gray-100 text-gray-700 border-gray-300' },
   { value: 'in-progress', label: '调音中', color: 'bg-blue-50 text-blue-700 border-blue-300' },

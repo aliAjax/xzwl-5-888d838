@@ -8,6 +8,10 @@ import type {
   DiffItem,
   ConflictResolution,
   MergeResult,
+  ImportModuleType,
+  ModuleStats,
+  ImportPreviewResult,
+  ImportModuleOptions,
 } from '@/types/record';
 import { getRecords } from './storage';
 import { getModes } from './modeStorage';
@@ -414,3 +418,186 @@ export const getLocalData = () => ({
   workbenchTasks: getWorkbenchTasks(),
   tombstones: getTombstones(),
 });
+
+const DIFF_CHANGE_TYPE_TO_MODULE_STATS: Record<DiffItem['changeType'], keyof ModuleStats> = {
+  new: 'added',
+  modified: 'modified',
+  deleted: 'deleted',
+  conflict: 'conflict',
+  unchanged: 'unchanged',
+};
+
+const ENTITY_TYPE_TO_MODULE_TYPE: Record<DiffItem['entityType'], ImportModuleType> = {
+  record: 'records',
+  mode: 'modes',
+  workbenchTask: 'workbenchTasks',
+};
+
+export const calculateModuleStats = (
+  diffs: DiffItem[],
+  importedBackup: VersionedBackup,
+  localData: ReturnType<typeof getLocalData>
+): ModuleStats[] => {
+  const moduleStatsMap = new Map<ImportModuleType, ModuleStats>();
+
+  const moduleTypes: ImportModuleType[] = ['records', 'modes', 'workbenchTasks', 'tombstones'];
+
+  moduleTypes.forEach((moduleType) => {
+    moduleStatsMap.set(moduleType, {
+      moduleType,
+      total: 0,
+      added: 0,
+      modified: 0,
+      deleted: 0,
+      conflict: 0,
+      unchanged: 0,
+    });
+  });
+
+  diffs.forEach((diff) => {
+    const moduleType = ENTITY_TYPE_TO_MODULE_TYPE[diff.entityType];
+    const stats = moduleStatsMap.get(moduleType);
+    if (stats) {
+      stats.total++;
+      const statsKey = DIFF_CHANGE_TYPE_TO_MODULE_STATS[diff.changeType];
+      stats[statsKey]++;
+    }
+  });
+
+  const tombstoneStats = moduleStatsMap.get('tombstones');
+  if (tombstoneStats) {
+    const localTombstoneMap = new Map(
+      localData.tombstones.map((t) => [`${t.entityType}:${t.id}`, t])
+    );
+    const importedTombstoneMap = new Map(
+      importedBackup.tombstones.map((t) => [`${t.entityType}:${t.id}`, t])
+    );
+
+    const allTombstoneKeys = new Set([
+      ...localTombstoneMap.keys(),
+      ...importedTombstoneMap.keys(),
+    ]);
+
+    allTombstoneKeys.forEach((key) => {
+      const local = localTombstoneMap.get(key);
+      const imported = importedTombstoneMap.get(key);
+
+      tombstoneStats.total++;
+
+      if (local && imported) {
+        tombstoneStats.unchanged++;
+      } else if (imported && !local) {
+        tombstoneStats.added++;
+      } else if (local && !imported) {
+        tombstoneStats.deleted++;
+      }
+    });
+  }
+
+  return Array.from(moduleStatsMap.values());
+};
+
+export const filterDiffsByModuleOptions = (
+  diffs: DiffItem[],
+  moduleOptions: ImportModuleOptions
+): DiffItem[] => {
+  return diffs.filter((diff) => {
+    const moduleType = ENTITY_TYPE_TO_MODULE_TYPE[diff.entityType];
+    return moduleOptions[moduleType];
+  });
+};
+
+export const hasAnyChanges = (moduleStats: ModuleStats[]): boolean => {
+  return moduleStats.some(
+    (stats) => stats.added > 0 || stats.modified > 0 || stats.deleted > 0 || stats.conflict > 0
+  );
+};
+
+export const hasSelectedModuleChanges = (
+  moduleStats: ModuleStats[],
+  moduleOptions: ImportModuleOptions
+): boolean => {
+  return moduleStats.some((stats) => {
+    if (!moduleOptions[stats.moduleType]) return false;
+    return stats.added > 0 || stats.modified > 0 || stats.deleted > 0 || stats.conflict > 0;
+  });
+};
+
+export const createImportPreview = (
+  importedBackup: VersionedBackup,
+  localData: ReturnType<typeof getLocalData>
+): ImportPreviewResult => {
+  const diffs = analyzeDiff(localData, importedBackup);
+  const moduleStats = calculateModuleStats(diffs, importedBackup, localData);
+
+  const warnings: string[] = [];
+
+  const orphanedTaskCount = diffs.filter(
+    (d) =>
+      d.entityType === 'workbenchTask' &&
+      d.changeType === 'new' &&
+      d.imported &&
+      !localData.records.some((r) => r.id === d.imported.recordId) &&
+      !importedBackup.records.some((r) => r.id === d.imported.recordId)
+  ).length;
+
+  if (orphanedTaskCount > 0) {
+    warnings.push(`检测到 ${orphanedTaskCount} 个工作台任务引用了不存在的记录，导入后将自动清理。`);
+  }
+
+  const recordModuleStats = moduleStats.find((s) => s.moduleType === 'records');
+  if (recordModuleStats && recordModuleStats.deleted > 0) {
+    warnings.push(`将删除 ${recordModuleStats.deleted} 条调音记录，请确认这是您预期的操作。`);
+  }
+
+  return {
+    moduleStats,
+    diffs,
+    importedBackup,
+    localData,
+    warnings,
+  };
+};
+
+export const applyResolutionsWithModuleOptions = (
+  localData: ReturnType<typeof getLocalData>,
+  diffs: DiffItem[],
+  moduleOptions: ImportModuleOptions,
+  importedBackup: VersionedBackup
+): MergeResult => {
+  const filteredDiffs = filterDiffsByModuleOptions(diffs, moduleOptions);
+
+  const tombstoneDiffs: DiffItem[] = [];
+  if (moduleOptions.tombstones) {
+    const localTombstoneMap = new Map(
+      localData.tombstones.map((t) => [`${t.entityType}:${t.id}`, t])
+    );
+    const importedTombstoneMap = new Map(
+      importedBackup.tombstones.map((t) => [`${t.entityType}:${t.id}`, t])
+    );
+
+    const allTombstoneKeys = new Set([
+      ...localTombstoneMap.keys(),
+      ...importedTombstoneMap.keys(),
+    ]);
+
+    allTombstoneKeys.forEach((key) => {
+      const [entityType, id] = key.split(':');
+      const local = localTombstoneMap.get(key);
+      const imported = importedTombstoneMap.get(key);
+
+      if (imported && !local) {
+        tombstoneDiffs.push({
+          id,
+          entityType: entityType as 'record' | 'mode' | 'workbenchTask',
+          changeType: 'new',
+          imported,
+          resolution: 'keep-imported',
+        });
+      }
+    });
+  }
+
+  const allDiffsToApply = [...filteredDiffs, ...tombstoneDiffs];
+  return applyResolutions(localData, allDiffsToApply);
+};

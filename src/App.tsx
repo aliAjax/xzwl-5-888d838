@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import type { HandpanRecord, FilterState, TuningRecord, DeliveryStatus, PhonemeDeviation, FollowUpRecord, FollowUpStatus, RecordConflict, DiffItem, VersionedBackup, ModeOption, FilterView, DeliveryChecklist } from "@/types/record";
+import type { HandpanRecord, FilterState, TuningRecord, DeliveryStatus, PhonemeDeviation, FollowUpRecord, FollowUpStatus, RecordConflict, DiffItem, VersionedBackup, ModeOption, FilterView, DeliveryChecklist, ImportPreviewResult, ImportModuleOptions } from "@/types/record";
 import { DEFAULT_MODE_OPTIONS } from "@/types/record";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { Header } from "@/components/Header";
@@ -22,7 +22,7 @@ import { BackupRestoreManager } from "@/components/BackupRestoreManager";
 import { parseImportData, analyzeImportData, mergeImportedRecords, migrateRecords, generateTuningId, addFollowUpRecord, updateFollowUpStatus, deleteFollowUpRecord, type ImportAnalysis, getRecords } from "@/utils/storage";
 import { getModes, saveModes } from "@/utils/modeStorage";
 import { getWorkbenchTasks, saveWorkbenchTasks, removeTasksByRecordId, cleanupInvalidTasks } from "@/utils/workbenchStorage";
-import { parseBackup, isVersionedBackup, analyzeDiff, applyResolutions, getLocalData, saveTombstones } from "@/utils/versionedBackup";
+import { parseBackup, isVersionedBackup, analyzeDiff, applyResolutions, getLocalData, saveTombstones, createImportPreview, applyResolutionsWithModuleOptions } from "@/utils/versionedBackup";
 import { getViews, addView, deleteView, renameView, getViewById } from "@/utils/viewStorage";
 
 const STORAGE_KEY = "handpan_records";
@@ -162,8 +162,7 @@ function App() {
   const [importAnalysis, setImportAnalysis] = useState<ImportAnalysis | null>(null);
   const [importFileName, setImportFileName] = useState("");
   const [isMergeOpen, setIsMergeOpen] = useState(false);
-  const [mergeDiffs, setMergeDiffs] = useState<DiffItem[]>([]);
-  const [importedBackup, setImportedBackup] = useState<VersionedBackup | null>(null);
+  const [importPreview, setImportPreview] = useState<ImportPreviewResult | null>(null);
   const [, setModes] = useLocalStorage<ModeOption[]>('handpan_mode_options', DEFAULT_MODE_OPTIONS);
   const [, setWorkbenchTasks] = useLocalStorage<any[]>('handpan_workbench', []);
   const [isDeliveryOpen, setIsDeliveryOpen] = useState(false);
@@ -307,16 +306,17 @@ function App() {
 
         if (isVersionedBackup(parsed)) {
           const localData = getLocalData();
-          const diffs = analyzeDiff(localData, parsed);
+          const preview = createImportPreview(parsed, localData);
 
-          const hasChanges = diffs.some(d => d.changeType !== 'unchanged');
+          const hasChanges = preview.moduleStats.some(
+            s => s.added > 0 || s.modified > 0 || s.deleted > 0 || s.conflict > 0
+          );
           if (!hasChanges) {
             alert("导入文件与本地数据完全一致，无需同步。");
             return;
           }
 
-          setImportedBackup(parsed);
-          setMergeDiffs(diffs);
+          setImportPreview(preview);
           setImportFileName(file.name);
           setIsMergeOpen(true);
         } else {
@@ -372,14 +372,20 @@ function App() {
 
   const handleCloseMerge = () => {
     setIsMergeOpen(false);
-    setMergeDiffs([]);
-    setImportedBackup(null);
+    setImportPreview(null);
     setImportFileName("");
   };
 
-  const handleConfirmMerge = (resolvedDiffs: DiffItem[]) => {
+  const handleConfirmMerge = (resolvedDiffs: DiffItem[], moduleOptions: ImportModuleOptions) => {
+    if (!importPreview) return;
+
     const localData = getLocalData();
-    const result = applyResolutions(localData, resolvedDiffs);
+    const result = applyResolutionsWithModuleOptions(
+      localData,
+      resolvedDiffs,
+      moduleOptions,
+      importPreview.importedBackup
+    );
 
     setRecords(result.records);
     setModes(result.modes);
@@ -662,8 +668,7 @@ function App() {
         isOpen={isMergeOpen}
         onClose={handleCloseMerge}
         onConfirm={handleConfirmMerge}
-        diffs={mergeDiffs}
-        importedBackup={importedBackup}
+        importPreview={importPreview}
         fileName={importFileName}
       />
       <DeliveryOrder
