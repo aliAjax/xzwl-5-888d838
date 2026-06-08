@@ -1,5 +1,6 @@
 import type { HandpanRecord, ModeOption, DeliveryStatus, TuningRecord } from '@/types/record';
-import { DELIVERY_STATUS_OPTIONS, getLatestTuningDate, migrateRecord, validateRecord } from './storage';
+import { DELIVERY_STATUS_OPTIONS, getLatestTuningDate } from '@/types/record';
+import { migrateRecord, validateRecord } from './storage';
 import { getModes } from './modeStorage';
 import { getWorkbenchTasks } from './workbenchStorage';
 
@@ -97,11 +98,38 @@ const generateIssueId = (): string => {
 };
 
 const safeGetRecord = (record: any): HandpanRecord | null => {
+  if (!record || typeof record !== 'object') {
+    return null;
+  }
   try {
-    return migrateRecord(record);
+    const migrated = migrateRecord(record);
+    if (!migrated || typeof migrated !== 'object') {
+      return null;
+    }
+    return migrated;
   } catch (error) {
     return null;
   }
+};
+
+const isRecordCorrupted = (raw: any): boolean => {
+  if (!raw || typeof raw !== 'object') {
+    return true;
+  }
+  try {
+    JSON.stringify(raw);
+    return false;
+  } catch {
+    return true;
+  }
+};
+
+const hasMissingTuningHistoryRaw = (raw: any): boolean => {
+  if (!raw || typeof raw !== 'object') return false;
+  if (!raw.tuningHistory || !Array.isArray(raw.tuningHistory) || raw.tuningHistory.length === 0) {
+    return true;
+  }
+  return false;
 };
 
 const isValidDate = (dateStr: string): boolean => {
@@ -143,27 +171,32 @@ const detectDuplicateSerials = (records: HandpanRecord[]): Issue[] => {
   return issues;
 };
 
-const detectMissingTuningHistory = (records: HandpanRecord[]): Issue[] => {
+const detectMissingTuningHistory = (rawRecords: any[], validRecords: HandpanRecord[]): Issue[] => {
   const issues: Issue[] = [];
 
-  records.forEach(record => {
-    if (!record.tuningHistory || record.tuningHistory.length === 0) {
+  rawRecords.forEach((raw, index) => {
+    if (isRecordCorrupted(raw)) return;
+    
+    if (hasMissingTuningHistoryRaw(raw)) {
+      const validRecord = validRecords[index];
+      if (!validRecord) return;
+
       issues.push({
         id: generateIssueId(),
         type: 'missing_tuning_history',
         severity: 'medium',
-        title: `缺少调音历史：${record.serialNumber}`,
-        description: `记录 "${record.serialNumber}" (${record.customerNickname}) 没有调音历史记录`,
+        title: `缺少调音历史：${validRecord.serialNumber}`,
+        description: `记录 "${validRecord.serialNumber}" (${validRecord.customerNickname}) 没有调音历史记录`,
         autoFixable: true,
-        recordId: record.id,
-        serialNumber: record.serialNumber,
-        affectedData: { recordId: record.id, lastTuningDate: record.lastTuningDate, deviationNote: record.deviationNote },
+        recordId: validRecord.id,
+        serialNumber: validRecord.serialNumber,
+        affectedData: { recordId: validRecord.id, lastTuningDate: validRecord.lastTuningDate, deviationNote: validRecord.deviationNote },
         suggestedFix: {
           description: '根据现有记录信息创建一条初始调音记录',
           preview: {
             action: '创建初始调音历史',
-            date: record.lastTuningDate || new Date().toISOString().split('T')[0],
-            deviationNote: record.deviationNote || '无',
+            date: validRecord.lastTuningDate || new Date().toISOString().split('T')[0],
+            deviationNote: validRecord.deviationNote || '无',
           },
         },
       });
@@ -355,24 +388,38 @@ const detectMissingRequiredFields = (records: HandpanRecord[]): Issue[] => {
   return issues;
 };
 
-const detectInvalidTuningHistory = (records: HandpanRecord[]): Issue[] => {
+const hasInvalidTuningHistoryRaw = (raw: any): boolean[] => {
+  if (!raw || typeof raw !== 'object') return [];
+  if (!raw.tuningHistory || !Array.isArray(raw.tuningHistory)) return [];
+  
+  return raw.tuningHistory.map((tuning: any) => {
+    if (!tuning || typeof tuning !== 'object') return true;
+    return !tuning.id || !tuning.date || !tuning.createdAt;
+  });
+};
+
+const detectInvalidTuningHistory = (rawRecords: any[], validRecords: HandpanRecord[]): Issue[] => {
   const issues: Issue[] = [];
 
-  records.forEach(record => {
-    if (!record.tuningHistory || !Array.isArray(record.tuningHistory)) return;
+  rawRecords.forEach((raw, index) => {
+    if (isRecordCorrupted(raw)) return;
+    
+    const invalidIndices = hasInvalidTuningHistoryRaw(raw);
+    const validRecord = validRecords[index];
+    if (!validRecord) return;
 
-    record.tuningHistory.forEach((tuning, index) => {
-      if (!tuning.id || !tuning.date || !tuning.createdAt) {
+    invalidIndices.forEach((isInvalid, tuningIndex) => {
+      if (isInvalid) {
         issues.push({
           id: generateIssueId(),
           type: 'invalid_tuning_history',
           severity: 'medium',
-          title: `调音记录损坏：${record.serialNumber} #${index + 1}`,
-          description: `记录 "${record.serialNumber}" 的第 ${index + 1} 条调音记录缺少必要字段`,
+          title: `调音记录损坏：${validRecord.serialNumber} #${tuningIndex + 1}`,
+          description: `记录 "${validRecord.serialNumber}" 的第 ${tuningIndex + 1} 条调音记录缺少必要字段`,
           autoFixable: true,
-          recordId: record.id,
-          serialNumber: record.serialNumber,
-          affectedData: { tuningIndex: index, tuning },
+          recordId: validRecord.id,
+          serialNumber: validRecord.serialNumber,
+          affectedData: { tuningIndex, tuning: raw.tuningHistory?.[tuningIndex] },
           suggestedFix: {
             description: '为调音记录补充缺失的必要字段',
             preview: {
@@ -510,9 +557,11 @@ const groupIssues = (issues: Issue[]): IssueGroup[] => {
 
   return groups.sort((a, b) => {
     const severityOrder: Record<IssueSeverity, number> = { high: 0, medium: 1, low: 2 };
-    const aMaxSeverity = Math.min(...a.issues.map(i => severityOrder[i.severity]));
-    const bMaxSeverity = Math.min(...b.issues.map(i => severityOrder[i.severity]));
-    return aMaxSeverity - bMaxSeverity;
+    const getMaxSeverity = (issues: Issue[]): number => {
+      if (issues.length === 0) return 3;
+      return Math.min(...issues.map(i => severityOrder[i.severity]));
+    };
+    return getMaxSeverity(a.issues) - getMaxSeverity(b.issues);
   });
 };
 
@@ -537,11 +586,11 @@ export const scanDataHealth = (): ScanResult => {
     allIssues.push(...detectCorruptedRecords(recordsArray));
     allIssues.push(...detectMissingRequiredFields(validRecords));
     allIssues.push(...detectDuplicateSerials(validRecords));
-    allIssues.push(...detectMissingTuningHistory(validRecords));
+    allIssues.push(...detectMissingTuningHistory(recordsArray, validRecords));
     allIssues.push(...detectInvalidDeliveryStatus(validRecords));
     allIssues.push(...detectInactiveModeInUse(validRecords, modes));
     allIssues.push(...detectTuningDateAfterUpdate(validRecords));
-    allIssues.push(...detectInvalidTuningHistory(validRecords));
+    allIssues.push(...detectInvalidTuningHistory(recordsArray, validRecords));
     allIssues.push(...detectOrphanedWorkbenchTasks(validRecords));
 
     const issueGroups = groupIssues(allIssues);

@@ -26,7 +26,7 @@ import {
   Zap,
   Shield,
 } from 'lucide-react';
-import type { Issue, IssueGroup, ScanResult, FixPreview, RepairSummary, IssueSeverity } from '@/utils/dataHealthCheck';
+import type { Issue, ScanResult, FixPreview, RepairSummary, IssueSeverity } from '@/utils/dataHealthCheck';
 import {
   scanDataHealth,
   generateFixPreviews,
@@ -62,6 +62,17 @@ const SEVERITY_CONFIG: Record<IssueSeverity, { label: string; color: string; bgC
   high: { label: '严重', color: 'text-red-700', bgColor: 'bg-red-50 border-red-200' },
   medium: { label: '中等', color: 'text-amber-700', bgColor: 'bg-amber-50 border-amber-200' },
   low: { label: '轻微', color: 'text-blue-700', bgColor: 'bg-blue-50 border-blue-200' },
+};
+
+const getHighestSeverity = (issues: Issue[]): IssueSeverity => {
+  const severityOrder: Record<IssueSeverity, number> = { high: 0, medium: 1, low: 2 };
+  let highest: IssueSeverity = 'low';
+  issues.forEach(issue => {
+    if (severityOrder[issue.severity] < severityOrder[highest]) {
+      highest = issue.severity;
+    }
+  });
+  return highest;
 };
 
 export function DataHealthCenter({ isOpen, onClose, onDataRepaired }: DataHealthCenterProps) {
@@ -344,7 +355,7 @@ export function DataHealthCenter({ isOpen, onClose, onDataRepaired }: DataHealth
                 {filteredGroups.map(group => (
                   <div
                     key={group.type}
-                    className={`border rounded-xl overflow-hidden ${SEVERITY_CONFIG[Math.min(...group.issues.map(i => i.severity === 'high' ? 'high' : i.severity === 'medium' ? 'medium' : 'low')) as IssueSeverity].bgColor}`}
+                    className={`border rounded-xl overflow-hidden ${SEVERITY_CONFIG[getHighestSeverity(group.issues)].bgColor}`}
                   >
                     <button
                       onClick={() => toggleGroup(group.type)}
