@@ -208,6 +208,105 @@ export const getAvailableRecordsForWorkbench = (
     });
 };
 
+export const getWeekDates = (baseDate: string): string[] => {
+  const date = new Date(baseDate);
+  const day = date.getDay();
+  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+  const weekStart = new Date(date.setDate(diff));
+  
+  const dates: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(weekStart);
+    d.setDate(weekStart.getDate() + i);
+    dates.push(d.toISOString().split('T')[0]);
+  }
+  
+  return dates;
+};
+
+export const getTasksForWeek = (weekStartDate: string): Map<string, WorkbenchTask[]> => {
+  const weekDates = getWeekDates(weekStartDate);
+  const allTasks = getWorkbenchTasks();
+  const tasksByDate = new Map<string, WorkbenchTask[]>();
+  
+  weekDates.forEach(date => {
+    const dateTasks = allTasks
+      .filter(task => task.taskDate === date)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+    tasksByDate.set(date, dateTasks);
+  });
+  
+  return tasksByDate;
+};
+
+export const moveTaskToDateAndStatus = (
+  taskId: string,
+  newDate: string,
+  newStatus: WorkbenchTaskStatus,
+  targetSortOrder?: number
+): WorkbenchTask | null => {
+  const tasks = getWorkbenchTasks();
+  const index = tasks.findIndex(t => t.id === taskId);
+  if (index === -1) return null;
+
+  const existingTask = tasks.find(
+    t => t.recordId === tasks[index].recordId && t.taskDate === newDate && t.id !== taskId
+  );
+  if (existingTask) {
+    return existingTask;
+  }
+
+  const task = tasks[index];
+  const tasksForDateAndStatus = tasks.filter(t => t.taskDate === newDate && t.status === newStatus);
+  
+  let sortOrder: number;
+  if (targetSortOrder !== undefined) {
+    sortOrder = targetSortOrder;
+    tasksForDateAndStatus.forEach(t => {
+      if (t.sortOrder >= sortOrder && t.id !== taskId) {
+        const tIndex = tasks.findIndex(tt => tt.id === t.id);
+        if (tIndex !== -1) {
+          tasks[tIndex] = { ...tasks[tIndex], sortOrder: tasks[tIndex].sortOrder + 1 };
+        }
+      }
+    });
+  } else {
+    const maxSortOrder = tasksForDateAndStatus.length > 0 
+      ? Math.max(...tasksForDateAndStatus.map(t => t.sortOrder)) 
+      : -1;
+    sortOrder = maxSortOrder + 1;
+  }
+
+  tasks[index] = {
+    ...task,
+    taskDate: newDate,
+    status: newStatus,
+    sortOrder,
+    updatedAt: new Date().toISOString(),
+  };
+
+  saveWorkbenchTasks(tasks);
+  return tasks[index];
+};
+
+export const getAvailableRecordsForWeek = (
+  allRecords: HandpanRecord[],
+  weekStartDate: string
+): HandpanRecord[] => {
+  const weekDates = getWeekDates(weekStartDate);
+  const tasks = getWorkbenchTasks();
+  const assignedRecordIds = new Set(
+    tasks.filter(t => weekDates.includes(t.taskDate)).map(t => t.recordId)
+  );
+  
+  return allRecords
+    .filter(r => r.deliveryStatus !== 'delivered' && !assignedRecordIds.has(r.id))
+    .sort((a, b) => {
+      const statusOrder: Record<string, number> = { 'pending': 0, 'in-progress': 1, 'completed': 2, 'delivered': 3 };
+      return statusOrder[a.deliveryStatus] - statusOrder[b.deliveryStatus];
+    });
+};
+
 export const autoAddRecordsToWorkbench = (
   allRecords: HandpanRecord[],
   taskDate: string
