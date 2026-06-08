@@ -1,4 +1,5 @@
 import type { HandpanRecord, TuningRecord, PhonemeDeviation } from '@/types/record';
+import { addTombstone, createVersionedBackup, isVersionedBackup, parseBackup } from './versionedBackup';
 
 const STORAGE_KEY = 'handpan_records';
 
@@ -130,12 +131,13 @@ export const deleteRecord = (id: string): boolean => {
   const filtered = records.filter(r => r.id !== id);
   if (filtered.length === records.length) return false;
   saveRecords(filtered);
+  addTombstone(id, 'record');
   return true;
 };
 
 export const exportRecords = (): string => {
-  const records = getRecords();
-  return JSON.stringify(records, null, 2);
+  const backup = createVersionedBackup();
+  return JSON.stringify(backup, null, 2);
 };
 
 export const downloadExport = (): void => {
@@ -144,7 +146,21 @@ export const downloadExport = (): void => {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `handpan-records-${new Date().toISOString().split('T')[0]}.json`;
+  link.download = `handpan-backup-${new Date().toISOString().split('T')[0]}.json`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
+export const downloadLegacyExport = (): void => {
+  const records = getRecords();
+  const dataStr = JSON.stringify(records, null, 2);
+  const blob = new Blob([dataStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `handpan-records-${new Date().toISOString().split('T')[0]}-legacy.json`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -202,11 +218,17 @@ export const validateRecord = (record: Partial<HandpanRecord>): { valid: boolean
 };
 
 export const parseImportData = (jsonString: string): Partial<HandpanRecord>[] => {
-  const parsed = JSON.parse(jsonString);
-  if (!Array.isArray(parsed)) {
-    throw new Error('导入文件格式错误：数据必须是数组格式');
+  const parsed = parseBackup(jsonString);
+  
+  if (isVersionedBackup(parsed)) {
+    return parsed.records;
   }
-  return parsed;
+  
+  if (Array.isArray(parsed)) {
+    return parsed;
+  }
+  
+  throw new Error('导入文件格式错误：无法识别的数据格式');
 };
 
 export const analyzeImportData = (

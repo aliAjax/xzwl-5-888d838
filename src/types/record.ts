@@ -151,6 +151,56 @@ export interface WorkbenchData {
   currentDate: string;
 }
 
+export interface Tombstone {
+  id: string;
+  entityType: 'record' | 'mode' | 'workbenchTask';
+  deletedAt: string;
+  deletedBy: string;
+}
+
+export interface BackupMetadata {
+  version: number;
+  backupFormatVersion: string;
+  deviceId: string;
+  createdAt: string;
+  exportedAt: string;
+  recordCount: number;
+  modeCount: number;
+  workbenchTaskCount: number;
+  tombstoneCount: number;
+}
+
+export interface VersionedBackup {
+  metadata: BackupMetadata;
+  records: HandpanRecord[];
+  modes: ModeOption[];
+  workbenchTasks: WorkbenchTask[];
+  tombstones: Tombstone[];
+}
+
+export type ChangeType = 'new' | 'modified' | 'deleted' | 'conflict' | 'unchanged';
+export type ConflictResolution = 'keep-local' | 'keep-imported' | 'manual' | 'pending';
+
+export interface DiffItem {
+  id: string;
+  entityType: 'record' | 'mode' | 'workbenchTask';
+  changeType: ChangeType;
+  local?: any;
+  imported?: any;
+  base?: any;
+  resolution: ConflictResolution;
+  merged?: any;
+  fieldConflicts?: string[];
+}
+
+export interface MergeResult {
+  records: HandpanRecord[];
+  modes: ModeOption[];
+  workbenchTasks: WorkbenchTask[];
+  tombstones: Tombstone[];
+  diffs: DiffItem[];
+}
+
 export const WORKBENCH_STATUS_OPTIONS: { value: WorkbenchTaskStatus; label: string; color: string }[] = [
   { value: 'pending', label: '待调音', color: 'bg-gray-100 text-gray-700 border-gray-300' },
   { value: 'in-progress', label: '调音中', color: 'bg-blue-50 text-blue-700 border-blue-300' },
