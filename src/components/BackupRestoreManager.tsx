@@ -40,7 +40,7 @@ import {
   importSnapshot,
   getSnapshotById,
 } from '@/utils/snapshotStorage';
-import { getRecords, migrateRecords } from '@/utils/storage';
+import { getRecords } from '@/utils/storage';
 
 interface BackupRestoreManagerProps {
   isOpen: boolean;
