@@ -132,6 +132,16 @@ const hasMissingTuningHistoryRaw = (raw: any): boolean => {
   return false;
 };
 
+const createInvalidStorageIssue = (rawData: any): Issue => ({
+  id: generateIssueId(),
+  type: 'corrupted_record',
+  severity: 'high',
+  title: '数据损坏：记录列表格式错误',
+  description: 'handpan_records 中的数据不是数组格式，无法按记录列表扫描',
+  autoFixable: false,
+  affectedData: { rawData },
+});
+
 const isValidDate = (dateStr: string): boolean => {
   if (!dateStr) return false;
   const date = new Date(dateStr);
@@ -171,14 +181,14 @@ const detectDuplicateSerials = (records: HandpanRecord[]): Issue[] => {
   return issues;
 };
 
-const detectMissingTuningHistory = (rawRecords: any[], validRecords: HandpanRecord[]): Issue[] => {
+const detectMissingTuningHistory = (rawRecords: any[]): Issue[] => {
   const issues: Issue[] = [];
 
-  rawRecords.forEach((raw, index) => {
+  rawRecords.forEach((raw) => {
     if (isRecordCorrupted(raw)) return;
     
     if (hasMissingTuningHistoryRaw(raw)) {
-      const validRecord = validRecords[index];
+      const validRecord = safeGetRecord(raw);
       if (!validRecord) return;
 
       issues.push({
@@ -398,14 +408,14 @@ const hasInvalidTuningHistoryRaw = (raw: any): boolean[] => {
   });
 };
 
-const detectInvalidTuningHistory = (rawRecords: any[], validRecords: HandpanRecord[]): Issue[] => {
+const detectInvalidTuningHistory = (rawRecords: any[]): Issue[] => {
   const issues: Issue[] = [];
 
-  rawRecords.forEach((raw, index) => {
+  rawRecords.forEach((raw) => {
     if (isRecordCorrupted(raw)) return;
     
     const invalidIndices = hasInvalidTuningHistoryRaw(raw);
-    const validRecord = validRecords[index];
+    const validRecord = safeGetRecord(raw);
     if (!validRecord) return;
 
     invalidIndices.forEach((isInvalid, tuningIndex) => {
@@ -571,7 +581,7 @@ export const scanDataHealth = (): ScanResult => {
     const recordsArray = Array.isArray(recordsRaw) ? recordsRaw : [];
 
     const validRecords: HandpanRecord[] = [];
-    recordsRaw.forEach((raw: any) => {
+    recordsArray.forEach((raw: any) => {
       const migrated = safeGetRecord(raw);
       if (migrated) {
         validRecords.push(migrated);
@@ -583,14 +593,17 @@ export const scanDataHealth = (): ScanResult => {
 
     const allIssues: Issue[] = [];
 
+    if (recordsRaw !== null && !Array.isArray(recordsRaw)) {
+      allIssues.push(createInvalidStorageIssue(recordsRaw));
+    }
     allIssues.push(...detectCorruptedRecords(recordsArray));
     allIssues.push(...detectMissingRequiredFields(validRecords));
     allIssues.push(...detectDuplicateSerials(validRecords));
-    allIssues.push(...detectMissingTuningHistory(recordsArray, validRecords));
+    allIssues.push(...detectMissingTuningHistory(recordsArray));
     allIssues.push(...detectInvalidDeliveryStatus(validRecords));
     allIssues.push(...detectInactiveModeInUse(validRecords, modes));
     allIssues.push(...detectTuningDateAfterUpdate(validRecords));
-    allIssues.push(...detectInvalidTuningHistory(recordsArray, validRecords));
+    allIssues.push(...detectInvalidTuningHistory(recordsArray));
     allIssues.push(...detectOrphanedWorkbenchTasks(validRecords));
 
     const issueGroups = groupIssues(allIssues);
