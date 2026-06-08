@@ -447,7 +447,7 @@ export const parseBackup = (jsonString: string): VersionedBackup | HandpanRecord
 };
 
 export const isVersionedBackup = (data: any): data is VersionedBackup => {
-  return data && data.metadata && data.metadata.backupFormatVersion && Array.isArray(data.records);
+  return !!(data && data.metadata && data.metadata.backupFormatVersion && Array.isArray(data.records));
 };
 
 export const getLocalData = () => ({
