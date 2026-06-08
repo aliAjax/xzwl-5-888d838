@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { X, Phone, Clock, Wrench, CheckCircle2, AlertCircle, Calendar, User, Music, ArrowRight, MessageSquare } from 'lucide-react';
-import type { HandpanRecord, FollowUpStatus, FollowUpCategory } from '@/types/record';
-import { calculateFollowUpQueue, getFollowUpStatusLabel, getFollowUpStatusColor, getLastContactDate, getNextFollowUpDate, getDaysDiff, getLatestTuningDate } from '@/types/record';
+import { X, Phone, Clock, Wrench, CheckCircle2, AlertCircle, Calendar, User, Music, ArrowRight, MessageSquare, AlertTriangle, CalendarDays } from 'lucide-react';
+import type { HandpanRecord, FollowUpStatus, FollowUpCategory, FollowUpQuickFilterType } from '@/types/record';
+import { calculateFollowUpQueue, getFollowUpStatusLabel, getFollowUpStatusColor, getLastContactDate, getNextFollowUpDate, getDaysDiff, getLatestTuningDate, calculateFollowUpQuickFilters } from '@/types/record';
 
 interface FollowUpListProps {
   isOpen: boolean;
@@ -26,9 +26,22 @@ const getCategoryIcon = (status: FollowUpStatus) => {
   }
 };
 
+const getQuickFilterIcon = (type: FollowUpQuickFilterType) => {
+  switch (type) {
+    case 'overdue':
+      return AlertTriangle;
+    case 'this-week':
+      return CalendarDays;
+    default:
+      return Calendar;
+  }
+};
+
 export function FollowUpList({ isOpen, onClose, records, onViewFollowUpDetail, onViewTuningHistory }: FollowUpListProps) {
   const [activeTab, setActiveTab] = useState<FollowUpStatus | 'all'>('all');
+  const [activeQuickFilter, setActiveQuickFilter] = useState<FollowUpQuickFilterType | null>(null);
   const followUpQueue = calculateFollowUpQueue(records);
+  const quickFilters = calculateFollowUpQuickFilters(records);
   const totalCount = followUpQueue.reduce((sum, r) => sum + r.count, 0);
 
   const formatDate = (dateStr: string | null) => {
@@ -41,6 +54,10 @@ export function FollowUpList({ isOpen, onClose, records, onViewFollowUpDetail, o
   };
 
   const getDisplayRecords = () => {
+    if (activeQuickFilter) {
+      const quickFilter = quickFilters.find(q => q.category.type === activeQuickFilter);
+      return quickFilter ? quickFilter.records : [];
+    }
     if (activeTab === 'all') {
       return followUpQueue.flatMap(category => category.records);
     }
@@ -83,26 +100,32 @@ export function FollowUpList({ isOpen, onClose, records, onViewFollowUpDetail, o
           <div className="p-6 border-b border-clay-100 bg-clay-50/50">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <button
-                onClick={() => setActiveTab('all')}
+                onClick={() => {
+                  setActiveTab('all');
+                  setActiveQuickFilter(null);
+                }}
                 className={`
                   flex flex-col items-center justify-center p-3 rounded-xl border transition-all
-                  ${activeTab === 'all'
+                  ${activeTab === 'all' && !activeQuickFilter
                     ? 'bg-brass-50 border-brass-300 ring-2 ring-brass-200'
                     : 'bg-white border-clay-200 hover:bg-clay-50'}
                 `}
               >
                 <span className="text-2xl font-bold text-ink-500">{totalCount}</span>
-                <span className={`text-xs mt-1 ${activeTab === 'all' ? 'text-brass-600 font-medium' : 'text-ink-400'}`}>
+                <span className={`text-xs mt-1 ${activeTab === 'all' && !activeQuickFilter ? 'text-brass-600 font-medium' : 'text-ink-400'}`}>
                   全部
                 </span>
               </button>
               {followUpQueue.map(({ category, count }) => {
                 const Icon = getCategoryIcon(category.status);
-                const isActive = activeTab === category.status;
+                const isActive = activeTab === category.status && !activeQuickFilter;
                 return (
                   <button
                     key={category.status}
-                    onClick={() => setActiveTab(category.status)}
+                    onClick={() => {
+                      setActiveTab(category.status);
+                      setActiveQuickFilter(null);
+                    }}
                     className={`
                       flex flex-col items-center justify-center p-3 rounded-xl border transition-all
                       ${isActive
@@ -121,6 +144,46 @@ export function FollowUpList({ isOpen, onClose, records, onViewFollowUpDetail, o
             </div>
           </div>
 
+          <div className="p-6 border-b border-clay-100">
+            <h4 className="text-sm font-semibold text-ink-400 mb-3">快捷筛选</h4>
+            <div className="grid grid-cols-2 gap-3">
+              {quickFilters.map(({ category, count }) => {
+                const Icon = getQuickFilterIcon(category.type);
+                const isActive = activeQuickFilter === category.type;
+                return (
+                  <button
+                    key={category.type}
+                    onClick={() => {
+                      setActiveQuickFilter(isActive ? null : category.type);
+                      if (!isActive) {
+                        setActiveTab('all');
+                      }
+                    }}
+                    className={`
+                      flex items-center justify-between p-4 rounded-xl border transition-all
+                      ${isActive
+                        ? `${category.bgColor} ${category.borderColor} ring-2 ring-offset-1`
+                        : 'bg-white border-clay-200 hover:bg-clay-50'}
+                    `}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-lg ${category.bgColor} ${category.borderColor} border flex items-center justify-center`}>
+                        <Icon className={`w-5 h-5 ${category.iconColor}`} />
+                      </div>
+                      <div className="text-left">
+                        <span className={`text-sm font-semibold ${isActive ? category.color : 'text-ink-500'}`}>
+                          {category.label}
+                        </span>
+                        <p className="text-xs text-ink-400">{category.description}</p>
+                      </div>
+                    </div>
+                    <span className="text-2xl font-bold text-ink-500">{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="p-6">
             {displayRecords.length === 0 ? (
               <div className="text-center py-16">
@@ -129,7 +192,9 @@ export function FollowUpList({ isOpen, onClose, records, onViewFollowUpDetail, o
                 </div>
                 <h4 className="text-lg font-medium text-ink-500 mb-2">暂无回访记录</h4>
                 <p className="text-ink-400 text-sm">
-                  {activeTab === 'all' 
+                  {activeQuickFilter
+                    ? `当前没有${quickFilters.find(q => q.category.type === activeQuickFilter)?.category.label}的记录`
+                    : activeTab === 'all'
                     ? '当前没有已交付的记录，交付后会自动进入回访队列'
                     : `当前没有${followUpQueue.find(c => c.category.status === activeTab)?.category.label}的记录`}
                 </p>
@@ -137,7 +202,11 @@ export function FollowUpList({ isOpen, onClose, records, onViewFollowUpDetail, o
             ) : (
               <div className="space-y-3">
                 {displayRecords.map((record) => {
-                  const category = followUpQueue.find(c => c.records.some(r => r.id === record.id))?.category as FollowUpCategory;
+                  const statusCategory = followUpQueue.find(c => c.records.some(r => r.id === record.id))?.category as FollowUpCategory;
+                  const quickFilterCategory = activeQuickFilter
+                    ? quickFilters.find(q => q.records.some(r => r.id === record.id))?.category
+                    : null;
+                  const displayCategory = quickFilterCategory || statusCategory;
                   const lastContactDate = getLastContactDate(record);
                   const nextFollowUpDate = getNextFollowUpDate(record);
                   const latestTuningDate = getLatestTuningDate(record);
@@ -149,15 +218,20 @@ export function FollowUpList({ isOpen, onClose, records, onViewFollowUpDetail, o
                       key={record.id}
                       className={`
                         rounded-xl p-4 border transition-all hover:shadow-md
-                        ${category.bgColor} ${category.borderColor}
+                        ${displayCategory.bgColor} ${displayCategory.borderColor}
                       `}
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-2">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getFollowUpStatusColor(category.status)}`}>
-                              {getFollowUpStatusLabel(category.status)}
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getFollowUpStatusColor(statusCategory.status)}`}>
+                              {getFollowUpStatusLabel(statusCategory.status)}
                             </span>
+                            {quickFilterCategory && (
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${quickFilterCategory.bgColor} ${quickFilterCategory.color} ${quickFilterCategory.borderColor} border`}>
+                                {quickFilterCategory.label}
+                              </span>
+                            )}
                             <span className="font-mono text-sm text-ink-500 font-medium">
                               {record.serialNumber}
                             </span>

@@ -1,4 +1,4 @@
-import { Edit2, Trash2, Calendar, User, Hash, FileText, History, Clock, Activity, Target } from 'lucide-react';
+import { Edit2, Trash2, Calendar, User, Hash, FileText, History, Clock, Activity, Target, BellRing } from 'lucide-react';
 import type { HandpanRecord } from '@/types/record';
 import {
   getStatusLabel,
@@ -6,6 +6,8 @@ import {
   getLatestTuning,
   getLatestTuningDate,
   getLatestDeviationNote,
+  getNextFollowUpDate,
+  isOverdueFollowUp,
 } from '@/types/record';
 import { getMaxDeviation, getCalibratedCount } from '@/types/record';
 
@@ -41,6 +43,8 @@ export function RecordCard({ record, onEdit, onDelete, onGenerateDelivery, onVie
   const latestTuningDate = getLatestTuningDate(record);
   const latestDeviationNote = getLatestDeviationNote(record);
   const tuningCount = record.tuningHistory?.length || 0;
+  const nextFollowUpDate = getNextFollowUpDate(record);
+  const isOverdue = isOverdueFollowUp(record);
 
   const getDeviationColor = (value: number | null) => {
     if (value === null) return 'text-ink-400';
@@ -89,6 +93,17 @@ export function RecordCard({ record, onEdit, onDelete, onGenerateDelivery, onVie
           <span>客户：</span>
           <span className="text-ink-500 font-medium">{record.customerNickname}</span>
         </div>
+
+        {nextFollowUpDate && (
+          <div className="flex items-center gap-2 text-sm text-ink-400">
+            <BellRing className={`w-4 h-4 ${isOverdue ? 'text-rose-500' : ''}`} />
+            <span>下次跟进：</span>
+            <span className={`font-medium ${isOverdue ? 'text-rose-600' : 'text-ink-500'}`}>
+              {formatDate(nextFollowUpDate)}
+              {isOverdue && <span className="ml-1 text-rose-500 text-xs">(已逾期)</span>}
+            </span>
+          </div>
+        )}
 
         {tuningCount > 0 && (
           <div className="flex items-center gap-2 text-sm text-ink-400">

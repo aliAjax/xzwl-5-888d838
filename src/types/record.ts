@@ -670,3 +670,134 @@ export interface RestoreResult {
   warnings: string[];
   timestamp: string;
 }
+
+export type FollowUpQuickFilterType = 'overdue' | 'this-week';
+
+export interface FollowUpQuickFilterCategory {
+  type: FollowUpQuickFilterType;
+  label: string;
+  description: string;
+  color: string;
+  bgColor: string;
+  borderColor: string;
+  iconColor: string;
+}
+
+export interface FollowUpQuickFilterResult {
+  category: FollowUpQuickFilterCategory;
+  records: HandpanRecord[];
+  count: number;
+}
+
+export const FOLLOW_UP_QUICK_FILTERS: FollowUpQuickFilterCategory[] = [
+  {
+    type: 'overdue',
+    label: '逾期跟进',
+    description: '下次跟进日期已过且未关闭',
+    color: 'text-rose-700',
+    bgColor: 'bg-rose-50',
+    borderColor: 'border-rose-300',
+    iconColor: 'text-rose-500',
+  },
+  {
+    type: 'this-week',
+    label: '本周待跟进',
+    description: '下次跟进日期在本周内',
+    color: 'text-amber-700',
+    bgColor: 'bg-amber-50',
+    borderColor: 'border-amber-300',
+    iconColor: 'text-amber-500',
+  },
+];
+
+const getWeekStart = (date: Date): Date => {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(d.setDate(diff));
+};
+
+const getWeekEnd = (date: Date): Date => {
+  const start = getWeekStart(date);
+  return new Date(start.getTime() + 6 * 24 * 60 * 60 * 1000);
+};
+
+export const isOverdueFollowUp = (record: HandpanRecord): boolean => {
+  const followUp = record.followUp;
+  if (!followUp) return false;
+  if (followUp.status === 'closed') return false;
+  if (!followUp.nextFollowUpDate) return false;
+
+  const nextDate = new Date(followUp.nextFollowUpDate);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  nextDate.setHours(0, 0, 0, 0);
+
+  return nextDate < today;
+};
+
+export const isThisWeekFollowUp = (record: HandpanRecord): boolean => {
+  const followUp = record.followUp;
+  if (!followUp) return false;
+  if (followUp.status === 'closed') return false;
+  if (!followUp.nextFollowUpDate) return false;
+
+  const nextDate = new Date(followUp.nextFollowUpDate);
+  const today = new Date();
+  const weekStart = getWeekStart(today);
+  const weekEnd = getWeekEnd(today);
+
+  weekStart.setHours(0, 0, 0, 0);
+  weekEnd.setHours(23, 59, 59, 999);
+  nextDate.setHours(12, 0, 0, 0);
+
+  return nextDate >= weekStart && nextDate <= weekEnd;
+};
+
+export const calculateFollowUpQuickFilters = (records: HandpanRecord[]): FollowUpQuickFilterResult[] => {
+  const overdue: HandpanRecord[] = [];
+  const thisWeek: HandpanRecord[] = [];
+
+  records.forEach((record) => {
+    if (record.deliveryStatus !== 'delivered') return;
+
+    if (isOverdueFollowUp(record)) {
+      overdue.push(record);
+    }
+    if (isThisWeekFollowUp(record)) {
+      thisWeek.push(record);
+    }
+  });
+
+  const sortByNextDate = (a: HandpanRecord, b: HandpanRecord) => {
+    const dateA = a.followUp?.nextFollowUpDate ? new Date(a.followUp.nextFollowUpDate).getTime() : Infinity;
+    const dateB = b.followUp?.nextFollowUpDate ? new Date(b.followUp.nextFollowUpDate).getTime() : Infinity;
+    return dateA - dateB;
+  };
+
+  overdue.sort(sortByNextDate);
+  thisWeek.sort(sortByNextDate);
+
+  return [
+    {
+      category: FOLLOW_UP_QUICK_FILTERS[0],
+      records: overdue,
+      count: overdue.length,
+    },
+    {
+      category: FOLLOW_UP_QUICK_FILTERS[1],
+      records: thisWeek,
+      count: thisWeek.length,
+    },
+  ];
+};
+
+export const getFollowUpQuickFilterLabel = (type: FollowUpQuickFilterType): string => {
+  const option = FOLLOW_UP_QUICK_FILTERS.find(opt => opt.type === type);
+  return option ? option.label : type;
+};
+
+export const getFollowUpQuickFilterColor = (type: FollowUpQuickFilterType): string => {
+  const option = FOLLOW_UP_QUICK_FILTERS.find(opt => opt.type === type);
+  return option ? option.color : 'text-gray-600';
+};
