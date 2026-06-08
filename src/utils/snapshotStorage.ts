@@ -366,12 +366,27 @@ export const createRestorePreview = (
     ? snapshotRecordIds
     : currentRecordIds;
 
-  const orphanedTasksAfterRestore = snapshot.data.workbenchTasks
-    .filter(t => !validRecordIdsAfterRestore.has(t.recordId))
-    .map(t => t.id);
+  let orphanedTasksAfterRestore: string[] = [];
 
-  if (orphanedTasksAfterRestore.length > 0) {
-    warnings.push(`恢复后将有 ${orphanedTasksAfterRestore.length} 个工作台任务引用不存在的记录，这些任务将被自动清理。`);
+  if (options.restoreWorkbench) {
+    orphanedTasksAfterRestore = snapshot.data.workbenchTasks
+      .filter(t => !validRecordIdsAfterRestore.has(t.recordId))
+      .map(t => t.id);
+
+    if (orphanedTasksAfterRestore.length > 0) {
+      warnings.push(`恢复后将有 ${orphanedTasksAfterRestore.length} 个工作台任务引用不存在的记录，这些任务将被自动清理。`);
+    }
+  } else if (options.restoreRecords) {
+    const deletedRecordIds = Array.from(currentRecordIds).filter(id => !snapshotRecordIds.has(id));
+    const deletedRecordIdSet = new Set(deletedRecordIds);
+    orphanedTasksAfterRestore = currentWorkbench
+      .filter(t => deletedRecordIdSet.has(t.recordId))
+      .map(t => t.id);
+
+    if (orphanedTasksAfterRestore.length > 0) {
+      willDeleteWorkbenchTasks = orphanedTasksAfterRestore.length;
+      warnings.push(`记录恢复后，将有 ${orphanedTasksAfterRestore.length} 个工作台任务引用已删除的记录，这些任务将被自动清理。`);
+    }
   }
 
   if (options.restoreWorkbench && !options.restoreRecords) {
@@ -383,6 +398,10 @@ export const createRestorePreview = (
     if (snapshotOnlyRecordIds.size > 0) {
       warnings.push('只恢复工作台但不恢复记录可能导致任务引用的记录不存在，建议同时恢复记录。');
     }
+  }
+
+  if (options.restoreRecords && !options.restoreWorkbench && willDeleteRecords > 0) {
+    warnings.push(`恢复记录将删除 ${willDeleteRecords} 条现有记录，引用这些记录的工作台任务将被自动清理。`);
   }
 
   return {

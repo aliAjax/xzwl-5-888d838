@@ -15,8 +15,6 @@ import {
   CheckCircle,
   ChevronDown,
   ChevronRight,
-  Eye,
-  FileJson,
   Plus,
   Info,
   Shield,
@@ -29,7 +27,6 @@ import type {
   RestoreOptions,
   RestorePreview,
   RestoreResult,
-  LocalSnapshot,
 } from '@/types/record';
 import {
   getSnapshotSummaries,
@@ -84,7 +81,6 @@ export function BackupRestoreManager({ isOpen, onClose, onRestoreComplete }: Bac
   const [restoreResult, setRestoreResult] = useState<RestoreResult | null>(null);
   const [expandedEntities, setExpandedEntities] = useState<Set<string>>(new Set());
   const [error, setError] = useState('');
-  const [importFileInput, setImportFileInput] = useState<HTMLInputElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadSnapshots = useCallback(() => {
@@ -727,22 +723,35 @@ export function BackupRestoreManager({ isOpen, onClose, onRestoreComplete }: Bac
                         工作台任务
                       </span>
                       <span className="text-sm text-ink-400">
-                        {restorePreview.willChangeWorkbench > 0 || restorePreview.willDeleteWorkbenchTasks > 0 ? (
-                          <>
-                            <span className="text-emerald-600">恢复 {restorePreview.willChangeWorkbench} 条</span>
-                            {restorePreview.willDeleteWorkbenchTasks > 0 && (
-                              <span className="text-rose-600 ml-2">
-                                · 清理 {restorePreview.willDeleteWorkbenchTasks} 条
-                              </span>
-                            )}
-                          </>
+                        {restoreOptions.restoreWorkbench ? (
+                          restorePreview.willChangeWorkbench > 0 || restorePreview.willDeleteWorkbenchTasks > 0 ? (
+                            <>
+                              <span className="text-emerald-600">恢复 {restorePreview.willChangeWorkbench} 条</span>
+                              {restorePreview.willDeleteWorkbenchTasks > 0 && (
+                                <span className="text-rose-600 ml-2">
+                                  · 清理 {restorePreview.willDeleteWorkbenchTasks} 条
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-gray-500">无变化</span>
+                          )
+                        ) : restorePreview.willDeleteWorkbenchTasks > 0 ? (
+                          <span className="text-rose-600">
+                            需清理 {restorePreview.willDeleteWorkbenchTasks} 条（引用已删除记录）
+                          </span>
                         ) : (
                           <span className="text-gray-500">无变化</span>
                         )}
                       </span>
                     </div>
                     <p className="text-sm text-ink-400 mt-1">
-                      恢复工作台的任务列表和状态
+                      {restoreOptions.restoreWorkbench
+                        ? '恢复工作台的任务列表和状态'
+                        : restorePreview.willDeleteWorkbenchTasks > 0
+                        ? '不恢复工作台，但将自动清理引用已删除记录的任务'
+                        : '不恢复工作台任务'
+                      }
                     </p>
                   </div>
                 </label>
