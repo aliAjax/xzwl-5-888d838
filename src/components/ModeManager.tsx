@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, ChevronUp, ChevronDown, Edit2, Check, X as XIcon, Power, Music2 } from 'lucide-react';
+import { X, Plus, ChevronUp, ChevronDown, Edit2, Check, X as XIcon, Power, Music2, Settings, Save, Trash2 } from 'lucide-react';
 import type { ModeOption } from '@/types/record';
-import { getModes, addMode, renameMode, toggleModeActive, moveMode } from '@/utils/modeStorage';
+import { getPhonemeNames } from '@/types/record';
+import { getModes, addMode, renameMode, toggleModeActive, moveMode, updateModePhonemeTemplate } from '@/utils/modeStorage';
 
 interface ModeManagerProps {
   isOpen: boolean;
@@ -14,6 +15,9 @@ export function ModeManager({ isOpen, onClose }: ModeManagerProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [error, setError] = useState('');
+  const [templateEditingId, setTemplateEditingId] = useState<string | null>(null);
+  const [templateNoteCount, setTemplateNoteCount] = useState(9);
+  const [templatePhonemeNames, setTemplatePhonemeNames] = useState<string[]>([]);
 
   const loadModes = () => {
     const loadedModes = getModes();
@@ -106,10 +110,68 @@ export function ModeManager({ isOpen, onClose }: ModeManagerProps) {
       e.preventDefault();
       if (editingId) {
         handleCancelEdit();
+      } else if (templateEditingId) {
+        handleCancelTemplateEdit();
       } else {
         onClose();
       }
     }
+  };
+
+  const handleStartTemplateEdit = (mode: ModeOption) => {
+    setTemplateEditingId(mode.id);
+    if (mode.phonemeDeviations && mode.phonemeDeviations.length > 0) {
+      setTemplateNoteCount(mode.phonemeDeviations.length);
+      setTemplatePhonemeNames(mode.phonemeDeviations.map(d => d.name));
+    } else {
+      setTemplateNoteCount(9);
+      setTemplatePhonemeNames(getPhonemeNames({} as any, 9));
+    }
+    setError('');
+  };
+
+  const handleCancelTemplateEdit = () => {
+    setTemplateEditingId(null);
+    setTemplateNoteCount(9);
+    setTemplatePhonemeNames([]);
+    setError('');
+  };
+
+  const handleTemplateNoteCountChange = (count: number) => {
+    if (count < 1) count = 1;
+    if (count > 20) count = 20;
+    setTemplateNoteCount(count);
+    setTemplatePhonemeNames(getPhonemeNames({} as any, count));
+  };
+
+  const handleTemplatePhonemeNameChange = (index: number, value: string) => {
+    setTemplatePhonemeNames(prev => {
+      const newNames = [...prev];
+      newNames[index] = value;
+      return newNames;
+    });
+  };
+
+  const handleSaveTemplate = () => {
+    if (!templateEditingId) return;
+
+    const validNames = templatePhonemeNames.filter(n => n.trim());
+    if (validNames.length === 0) {
+      setError('请至少输入一个音位名称');
+      return;
+    }
+
+    updateModePhonemeTemplate(templateEditingId, templatePhonemeNames);
+    setTemplateEditingId(null);
+    setTemplateNoteCount(9);
+    setTemplatePhonemeNames([]);
+    setError('');
+    loadModes();
+  };
+
+  const handleClearTemplate = (id: string) => {
+    updateModePhonemeTemplate(id, []);
+    loadModes();
   };
 
   if (!isOpen) return null;
@@ -214,7 +276,58 @@ export function ModeManager({ isOpen, onClose }: ModeManagerProps) {
                         </button>
                       </div>
 
-                      {editingId === mode.id ? (
+                      {templateEditingId === mode.id ? (
+                        <div className="flex-1 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-ink-500">
+                              编辑「{mode.name}」音位模板
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={handleSaveTemplate}
+                                className="p-1.5 rounded-lg text-green-600 hover:bg-green-50 transition-colors"
+                                title="保存模板"
+                              >
+                                <Save className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={handleCancelTemplateEdit}
+                                className="p-1.5 rounded-lg text-ink-400 hover:bg-clay-100 transition-colors"
+                                title="取消"
+                              >
+                                <XIcon className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs text-ink-400">音位数量：</label>
+                            <input
+                              type="number"
+                              min="1"
+                              max="20"
+                              value={templateNoteCount}
+                              onChange={(e) => handleTemplateNoteCountChange(parseInt(e.target.value) || 1)}
+                              className="input-field py-1 px-2 text-sm w-20"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
+                            {templatePhonemeNames.map((name, index) => (
+                              <div key={index} className="flex items-center gap-2">
+                                <span className="text-xs text-ink-400 w-10 font-mono">
+                                  {index === 0 ? 'Ding' : `#${index}`}
+                                </span>
+                                <input
+                                  type="text"
+                                  value={name}
+                                  onChange={(e) => handleTemplatePhonemeNameChange(index, e.target.value)}
+                                  className="input-field py-1 px-2 text-sm flex-1"
+                                  placeholder={index === 0 ? 'Ding' : `音位 ${index}`}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : editingId === mode.id ? (
                         <div className="flex-1 flex items-center gap-2">
                           <input
                             type="text"
@@ -240,21 +353,49 @@ export function ModeManager({ isOpen, onClose }: ModeManagerProps) {
                       ) : (
                         <>
                           <div className="flex-1">
-                            <span
-                              className={`text-sm font-medium ${
-                                mode.active ? 'text-ink-500' : 'text-ink-300 line-through'
-                              }`}
-                            >
-                              {mode.name}
-                            </span>
-                            {!mode.active && (
-                              <span className="ml-2 text-xs text-ink-400">
-                                (已停用)
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`text-sm font-medium ${
+                                  mode.active ? 'text-ink-500' : 'text-ink-300 line-through'
+                                }`}
+                              >
+                                {mode.name}
                               </span>
+                              {mode.phonemeDeviations && mode.phonemeDeviations.length > 0 && (
+                                <span className="text-xs bg-brass-100 text-brass-700 px-2 py-0.5 rounded-full">
+                                  {mode.phonemeDeviations.length} 音位模板
+                                </span>
+                              )}
+                              {!mode.active && (
+                                <span className="ml-2 text-xs text-ink-400">
+                                  (已停用)
+                                </span>
+                              )}
+                            </div>
+                            {mode.phonemeDeviations && mode.phonemeDeviations.length > 0 && (
+                              <div className="text-xs text-ink-400 mt-0.5 truncate">
+                                {mode.phonemeDeviations.map(d => d.name).join(' / ')}
+                              </div>
                             )}
                           </div>
 
                           <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleStartTemplateEdit(mode)}
+                              className="p-1.5 rounded-lg text-ink-400 hover:text-brass-500 hover:bg-brass-50 transition-colors"
+                              title={mode.phonemeDeviations?.length ? '编辑音位模板' : '设置音位模板'}
+                            >
+                              <Settings className="w-4 h-4" />
+                            </button>
+                            {mode.phonemeDeviations && mode.phonemeDeviations.length > 0 && (
+                              <button
+                                onClick={() => handleClearTemplate(mode.id)}
+                                className="p-1.5 rounded-lg text-ink-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                title="清除模板"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
                             <button
                               onClick={() => handleStartEdit(mode)}
                               className="p-1.5 rounded-lg text-ink-400 hover:text-clay-500 hover:bg-clay-50 transition-colors"

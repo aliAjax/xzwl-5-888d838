@@ -166,3 +166,40 @@ export const deleteMode = (id: string): boolean => {
   addTombstone(id, 'mode');
   return true;
 };
+
+export const getModeByName = (name: string): ModeOption | undefined => {
+  const modes = getModes();
+  return modes.find(m => m.name === name);
+};
+
+export const getModePhonemeTemplate = (modeName: string): { noteCount: number; phonemeNames: string[] } | null => {
+  const mode = getModeByName(modeName);
+  if (!mode || !mode.phonemeDeviations || mode.phonemeDeviations.length === 0) {
+    return null;
+  }
+  return {
+    noteCount: mode.phonemeDeviations.length,
+    phonemeNames: mode.phonemeDeviations.map(d => d.name),
+  };
+};
+
+export const updateModePhonemeTemplate = (id: string, phonemeNames: string[]): ModeOption | null => {
+  const modes = getModes();
+  const index = modes.findIndex(m => m.id === id);
+  if (index === -1) return null;
+
+  const phonemeDeviations = phonemeNames.map(name => ({
+    name,
+    beforeDeviation: null,
+    afterDeviation: null,
+    remark: '',
+  }));
+
+  modes[index] = {
+    ...modes[index],
+    phonemeDeviations,
+    updatedAt: new Date().toISOString(),
+  };
+  saveModes(modes);
+  return modes[index];
+};

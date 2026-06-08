@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { X, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import type { HandpanRecord, DeliveryStatus, TuningRecord } from '@/types/record';
 import { DELIVERY_STATUS_OPTIONS, getLatestTuning, getPhonemeNames } from '@/types/record';
 import { generateId, generateTuningId } from '@/utils/storage';
-import { getModeOptionsForForm } from '@/utils/modeStorage';
+import { getModeOptionsForForm, getModePhonemeTemplate } from '@/utils/modeStorage';
 
 interface RecordFormProps {
   isOpen: boolean;
@@ -55,15 +55,19 @@ export function RecordForm({ isOpen, onClose, onSave, editingRecord }: RecordFor
           phonemeNames: getPhonemeNames(editingRecord, editingRecord.noteCount),
         });
       } else {
+        const template = getModePhonemeTemplate(defaultMode);
+        const initialNoteCount = template ? template.noteCount : 9;
+        const initialPhonemeNames = template ? template.phonemeNames : getPhonemeNames({} as HandpanRecord, 9);
+        
         setFormData({
           serialNumber: '',
           mode: defaultMode,
-          noteCount: 9,
+          noteCount: initialNoteCount,
           lastTuningDate: new Date().toISOString().split('T')[0],
           deviationNote: '',
           customerNickname: '',
           deliveryStatus: 'pending',
-          phonemeNames: getPhonemeNames({} as HandpanRecord, 9),
+          phonemeNames: initialPhonemeNames,
         });
       }
       setErrors({});
@@ -142,6 +146,19 @@ export function RecordForm({ isOpen, onClose, onSave, editingRecord }: RecordFor
         noteCount: count,
         phonemeNames: getPhonemeNames(prev as HandpanRecord, count),
       }));
+    } else if (field === 'mode') {
+      const modeName = value as string;
+      const template = getModePhonemeTemplate(modeName);
+      if (template) {
+        setFormData(prev => ({
+          ...prev,
+          mode: modeName,
+          noteCount: template.noteCount,
+          phonemeNames: template.phonemeNames,
+        }));
+      } else {
+        setFormData(prev => ({ ...prev, mode: modeName }));
+      }
     } else {
       setFormData(prev => ({ ...prev, [field]: value }));
     }
@@ -220,25 +237,39 @@ export function RecordForm({ isOpen, onClose, onSave, editingRecord }: RecordFor
                 <label className="block text-sm font-medium text-ink-500 mb-1.5">
                   调式
                 </label>
-                <select
-                  value={formData.mode}
-                  onChange={(e) => handleChange('mode', e.target.value)}
-                  className="select-field"
-                >
-                  {modeOptions.map((mode) => {
-                    const isEditingExisting = editingRecord && editingRecord.mode === mode;
-                    const isActive = getModeOptionsForForm().includes(mode);
-                    return (
-                      <option 
-                        key={mode} 
-                        value={mode}
-                        disabled={!isActive && !isEditingExisting}
-                      >
-                        {mode}{!isActive ? ' (已停用)' : ''}
-                      </option>
-                    );
-                  })}
-                </select>
+                <div className="relative">
+                  <select
+                    value={formData.mode}
+                    onChange={(e) => handleChange('mode', e.target.value)}
+                    className="select-field"
+                  >
+                    {modeOptions.map((mode) => {
+                      const isEditingExisting = editingRecord && editingRecord.mode === mode;
+                      const isActive = getModeOptionsForForm().includes(mode);
+                      const hasTemplate = getModePhonemeTemplate(mode) !== null;
+                      return (
+                        <option 
+                          key={mode} 
+                          value={mode}
+                          disabled={!isActive && !isEditingExisting}
+                        >
+                          {mode}{hasTemplate ? ' ✨' : ''}{!isActive ? ' (已停用)' : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  {getModePhonemeTemplate(formData.mode) && (
+                    <div className="absolute -top-1 -right-1">
+                      <Sparkles className="w-4 h-4 text-brass-500" />
+                    </div>
+                  )}
+                </div>
+                {getModePhonemeTemplate(formData.mode) && !editingRecord && (
+                  <p className="text-xs text-brass-600 mt-1 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3" />
+                    已自动应用音位模板
+                  </p>
+                )}
               </div>
 
               <div>
