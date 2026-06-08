@@ -17,6 +17,7 @@ import { TuningWorkbench } from "@/components/TuningWorkbench";
 import { DataHealthCenter } from "@/components/DataHealthCenter";
 import { FollowUpList } from "@/components/FollowUpList";
 import { FollowUpDetail } from "@/components/FollowUpDetail";
+import { TuningQualityDashboard } from "@/components/TuningQualityDashboard";
 import { parseImportData, analyzeImportData, mergeImportedRecords, migrateRecords, generateTuningId, addFollowUpRecord, updateFollowUpStatus, deleteFollowUpRecord, type ImportAnalysis } from "@/utils/storage";
 import { saveModes } from "@/utils/modeStorage";
 import { saveWorkbenchTasks, removeTasksByRecordId, cleanupInvalidTasks } from "@/utils/workbenchStorage";
@@ -169,6 +170,7 @@ function App() {
   const [isFollowUpListOpen, setIsFollowUpListOpen] = useState(false);
   const [isFollowUpDetailOpen, setIsFollowUpDetailOpen] = useState(false);
   const [followUpDetailRecord, setFollowUpDetailRecord] = useState<HandpanRecord | null>(null);
+  const [isQualityDashboardOpen, setIsQualityDashboardOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -413,6 +415,14 @@ function App() {
     setIsDataHealthOpen(false);
   };
 
+  const handleOpenQualityDashboard = () => {
+    setIsQualityDashboardOpen(true);
+  };
+
+  const handleCloseQualityDashboard = () => {
+    setIsQualityDashboardOpen(false);
+  };
+
   const handleDataRepaired = (updatedRecords: HandpanRecord[]) => {
     setRecords(updatedRecords);
   };
@@ -520,7 +530,7 @@ function App() {
         onChange={handleFileSelect}
         className="hidden"
       />
-      <Header onImportClick={handleImportClick} onModeManagerClick={handleOpenModeManager} onDataHealthClick={handleOpenDataHealth} onFollowUpClick={handleOpenFollowUpList} />
+      <Header onImportClick={handleImportClick} onModeManagerClick={handleOpenModeManager} onDataHealthClick={handleOpenDataHealth} onFollowUpClick={handleOpenFollowUpList} onQualityDashboardClick={handleOpenQualityDashboard} />
       <FilterBar filters={filters} onFilterChange={setFilters} records={records} onOpenWorkbench={handleOpenWorkbench} />
       <TuningReminderBoard records={records} filters={filters} onFilterChange={setFilters} />
       <RecordList 
@@ -596,6 +606,11 @@ function App() {
         onUpdateStatus={handleUpdateFollowUpStatus}
         onDeleteFollowUp={handleDeleteFollowUp}
         onViewTuningHistory={handleOpenTuningHistoryFromFollowUp}
+      />
+      <TuningQualityDashboard
+        isOpen={isQualityDashboardOpen}
+        onClose={handleCloseQualityDashboard}
+        records={records}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import { Download, Upload, Music2, Settings, Shield, MessageSquare } from 'lucide-react';
+import { Download, Upload, Music2, Settings, Shield, MessageSquare, BarChart3 } from 'lucide-react';
 import { downloadExport } from '@/utils/storage';
 
 interface HeaderProps {
@@ -6,9 +6,10 @@ interface HeaderProps {
   onModeManagerClick: () => void;
   onDataHealthClick: () => void;
   onFollowUpClick: () => void;
+  onQualityDashboardClick: () => void;
 }
 
-export function Header({ onImportClick, onModeManagerClick, onDataHealthClick, onFollowUpClick }: HeaderProps) {
+export function Header({ onImportClick, onModeManagerClick, onDataHealthClick, onFollowUpClick, onQualityDashboardClick }: HeaderProps) {
   const handleExport = () => {
     downloadExport();
   };
@@ -44,6 +45,13 @@ export function Header({ onImportClick, onModeManagerClick, onDataHealthClick, o
             >
               <Shield className="w-4 h-4" />
               <span>数据体检</span>
+            </button>
+            <button
+              onClick={onQualityDashboardClick}
+              className="btn-secondary inline-flex items-center gap-2"
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span>质量分析</span>
             </button>
             <button
               onClick={onModeManagerClick}
