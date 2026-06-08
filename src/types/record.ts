@@ -563,3 +563,93 @@ export const calculateFollowUpQueue = (records: HandpanRecord[]): FollowUpResult
 export const generateFollowUpId = (): string => {
   return 'followup-' + Date.now().toString(36) + Math.random().toString(36).substr(2);
 };
+
+export type SnapshotEntityType = 'records' | 'workbench' | 'modes' | 'all';
+
+export interface LocalSnapshot {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  formatVersion: string;
+  dataVersion: number;
+  recordCount: number;
+  workbenchTaskCount: number;
+  modeCount: number;
+  tombstoneCount: number;
+  data: {
+    records: HandpanRecord[];
+    workbenchTasks: WorkbenchTask[];
+    modes: ModeOption[];
+    tombstones: Tombstone[];
+  };
+}
+
+export interface SnapshotSummary {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  formatVersion: string;
+  dataVersion: number;
+  recordCount: number;
+  workbenchTaskCount: number;
+  modeCount: number;
+  tombstoneCount: number;
+}
+
+export interface EntityComparison {
+  entityType: 'records' | 'workbench' | 'modes';
+  currentCount: number;
+  snapshotCount: number;
+  diff: number;
+  added: number;
+  modified: number;
+  deleted: number;
+  unchanged: number;
+  changes: {
+    type: 'added' | 'modified' | 'deleted';
+    id: string;
+    label: string;
+    fieldChanges?: string[];
+  }[];
+}
+
+export interface ComparisonResult {
+  snapshotId: string;
+  snapshotName: string;
+  comparedAt: string;
+  entities: EntityComparison[];
+  hasConflicts: boolean;
+  orphanedWorkbenchTasks: string[];
+}
+
+export interface RestoreOptions {
+  restoreRecords: boolean;
+  restoreWorkbench: boolean;
+  restoreModes: boolean;
+}
+
+export interface RestorePreview {
+  snapshotId: string;
+  snapshotName: string;
+  options: RestoreOptions;
+  willChangeRecords: number;
+  willChangeWorkbench: number;
+  willChangeModes: number;
+  willDeleteRecords: number;
+  willDeleteWorkbenchTasks: number;
+  willDeleteModes: number;
+  orphanedTasksAfterRestore: string[];
+  warnings: string[];
+}
+
+export interface RestoreResult {
+  success: boolean;
+  restoredRecords: number;
+  restoredWorkbenchTasks: number;
+  restoredModes: number;
+  cleanedOrphanedTasks: number;
+  warnings: string[];
+  timestamp: string;
+}

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import type { HandpanRecord, FilterState, TuningRecord, DeliveryStatus, PhonemeDeviation, FollowUpRecord, FollowUpStatus, RecordConflict, DiffItem, VersionedBackup, ModeOption } from "@/types/record";
 import { DEFAULT_MODE_OPTIONS } from "@/types/record";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
@@ -18,9 +18,10 @@ import { DataHealthCenter } from "@/components/DataHealthCenter";
 import { FollowUpList } from "@/components/FollowUpList";
 import { FollowUpDetail } from "@/components/FollowUpDetail";
 import { TuningQualityDashboard } from "@/components/TuningQualityDashboard";
-import { parseImportData, analyzeImportData, mergeImportedRecords, migrateRecords, generateTuningId, addFollowUpRecord, updateFollowUpStatus, deleteFollowUpRecord, type ImportAnalysis } from "@/utils/storage";
-import { saveModes } from "@/utils/modeStorage";
-import { saveWorkbenchTasks, removeTasksByRecordId, cleanupInvalidTasks } from "@/utils/workbenchStorage";
+import { BackupRestoreManager } from "@/components/BackupRestoreManager";
+import { parseImportData, analyzeImportData, mergeImportedRecords, migrateRecords, generateTuningId, addFollowUpRecord, updateFollowUpStatus, deleteFollowUpRecord, type ImportAnalysis, getRecords } from "@/utils/storage";
+import { getModes, saveModes } from "@/utils/modeStorage";
+import { getWorkbenchTasks, saveWorkbenchTasks, removeTasksByRecordId, cleanupInvalidTasks } from "@/utils/workbenchStorage";
 import { parseBackup, isVersionedBackup, analyzeDiff, applyResolutions, getLocalData, saveTombstones } from "@/utils/versionedBackup";
 
 const STORAGE_KEY = "handpan_records";
@@ -171,7 +172,30 @@ function App() {
   const [isFollowUpDetailOpen, setIsFollowUpDetailOpen] = useState(false);
   const [followUpDetailRecord, setFollowUpDetailRecord] = useState<HandpanRecord | null>(null);
   const [isQualityDashboardOpen, setIsQualityDashboardOpen] = useState(false);
+  const [isBackupRestoreOpen, setIsBackupRestoreOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const refreshAllData = useCallback(() => {
+    const freshRecords = getRecords();
+    const freshModes = getModes();
+    const freshWorkbenchTasks = getWorkbenchTasks();
+
+    setRecords(freshRecords);
+    setModes(freshModes);
+    setWorkbenchTasks(freshWorkbenchTasks);
+
+    setDetailRecord(null);
+    setIsDetailOpen(false);
+    setFollowUpDetailRecord(null);
+    setIsFollowUpDetailOpen(false);
+    setIsWorkbenchOpen(false);
+    setEditingRecord(null);
+    setIsFormOpen(false);
+  }, [setRecords, setModes, setWorkbenchTasks]);
+
+  const handleRestoreComplete = useCallback(() => {
+    refreshAllData();
+  }, [refreshAllData]);
 
   useEffect(() => {
     const migrated = migrateRecords(records);
@@ -423,6 +447,14 @@ function App() {
     setIsQualityDashboardOpen(false);
   };
 
+  const handleOpenBackupRestore = () => {
+    setIsBackupRestoreOpen(true);
+  };
+
+  const handleCloseBackupRestore = () => {
+    setIsBackupRestoreOpen(false);
+  };
+
   const handleDataRepaired = (updatedRecords: HandpanRecord[]) => {
     setRecords(updatedRecords);
   };
@@ -530,7 +562,7 @@ function App() {
         onChange={handleFileSelect}
         className="hidden"
       />
-      <Header onImportClick={handleImportClick} onModeManagerClick={handleOpenModeManager} onDataHealthClick={handleOpenDataHealth} onFollowUpClick={handleOpenFollowUpList} onQualityDashboardClick={handleOpenQualityDashboard} />
+      <Header onImportClick={handleImportClick} onModeManagerClick={handleOpenModeManager} onDataHealthClick={handleOpenDataHealth} onFollowUpClick={handleOpenFollowUpList} onQualityDashboardClick={handleOpenQualityDashboard} onBackupRestoreClick={handleOpenBackupRestore} />
       <FilterBar filters={filters} onFilterChange={setFilters} records={records} onOpenWorkbench={handleOpenWorkbench} />
       <TuningReminderBoard records={records} filters={filters} onFilterChange={setFilters} />
       <RecordList 
@@ -611,6 +643,11 @@ function App() {
         isOpen={isQualityDashboardOpen}
         onClose={handleCloseQualityDashboard}
         records={records}
+      />
+      <BackupRestoreManager
+        isOpen={isBackupRestoreOpen}
+        onClose={handleCloseBackupRestore}
+        onRestoreComplete={handleRestoreComplete}
       />
     </div>
   );
