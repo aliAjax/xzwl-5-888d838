@@ -243,7 +243,7 @@ export const moveTaskToDateAndStatus = (
   taskId: string,
   newDate: string,
   newStatus: WorkbenchTaskStatus,
-  targetSortOrder?: number
+  target?: { taskId: string; position: 'before' | 'after' }
 ): WorkbenchTask | null => {
   const tasks = getWorkbenchTasks();
   const index = tasks.findIndex(t => t.id === taskId);
@@ -257,35 +257,31 @@ export const moveTaskToDateAndStatus = (
   }
 
   const task = tasks[index];
-  const tasksForDateAndStatus = tasks.filter(t => t.taskDate === newDate && t.status === newStatus);
-  
-  let sortOrder: number;
-  if (targetSortOrder !== undefined) {
-    sortOrder = targetSortOrder;
-    tasksForDateAndStatus.forEach(t => {
-      if (t.sortOrder >= sortOrder && t.id !== taskId) {
-        const tIndex = tasks.findIndex(tt => tt.id === t.id);
-        if (tIndex !== -1) {
-          tasks[tIndex] = { ...tasks[tIndex], sortOrder: tasks[tIndex].sortOrder + 1 };
-        }
-      }
-    });
-  } else {
-    const maxSortOrder = tasksForDateAndStatus.length > 0 
-      ? Math.max(...tasksForDateAndStatus.map(t => t.sortOrder)) 
-      : -1;
-    sortOrder = maxSortOrder + 1;
-  }
+  const tasksForDateAndStatus = tasks
+    .filter(t => t.taskDate === newDate && t.status === newStatus && t.id !== taskId)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
 
   tasks[index] = {
     ...task,
     taskDate: newDate,
     status: newStatus,
-    sortOrder,
+    sortOrder: tasksForDateAndStatus.length,
     updatedAt: new Date().toISOString(),
   };
 
   saveWorkbenchTasks(tasks);
+
+  if (target) {
+    const targetIndex = tasksForDateAndStatus.findIndex(t => t.id === target.taskId);
+    if (targetIndex !== -1) {
+      const orderedTasks = [...tasksForDateAndStatus];
+      const insertIndex = target.position === 'after' ? targetIndex + 1 : targetIndex;
+      orderedTasks.splice(insertIndex, 0, tasks[index]);
+      reorderTasks(newDate, newStatus, orderedTasks.map(t => t.id));
+      return getWorkbenchTasks().find(t => t.id === taskId) || null;
+    }
+  }
+
   return tasks[index];
 };
 

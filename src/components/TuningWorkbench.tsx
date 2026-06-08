@@ -235,15 +235,11 @@ export function TuningWorkbench({
       reorderTasks(targetDate, targetStatus, orderedIds);
       loadWeekTasks();
     } else if (!isSameDate || !isSameStatus) {
-      let newSortOrder: number | undefined;
-      
-      if (dragTarget?.taskId) {
-        const targetTasks = getTasksForDateAndStatus(targetDate, targetStatus);
-        const targetIndex = targetTasks.findIndex(t => t.id === dragTarget.taskId);
-        newSortOrder = dragTarget.position === 'after' ? targetIndex + 1 : targetIndex;
-      }
+      const dropTarget = dragTarget?.taskId && dragTarget.position
+        ? { taskId: dragTarget.taskId, position: dragTarget.position }
+        : undefined;
 
-      const updatedTask = moveTaskToDateAndStatus(draggedTask.id, targetDate, targetStatus, newSortOrder);
+      const updatedTask = moveTaskToDateAndStatus(draggedTask.id, targetDate, targetStatus, dropTarget);
       if (updatedTask) {
         if (!isSameStatus) {
           const statusMap: Record<WorkbenchTaskStatus, 'pending' | 'in-progress' | 'completed'> = {
