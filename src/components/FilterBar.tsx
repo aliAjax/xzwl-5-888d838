@@ -154,18 +154,25 @@ export function FilterBar({
                   </button>
                 </div>
               ) : (
-                <button
-                  onClick={() => handleSelectView(view.id)}
-                  className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                <div
+                  className={`inline-flex items-center rounded-lg text-sm font-medium transition-all ${
                     activeViewId === view.id
                       ? 'bg-brass-500 text-white shadow-sm'
                       : 'bg-white text-ink-500 border border-clay-200 hover:border-brass-300 hover:text-brass-600'
                   }`}
                 >
-                  <span>{view.name}</span>
                   <button
+                    type="button"
+                    onClick={() => handleSelectView(view.id)}
+                    className="px-3 py-1.5 rounded-l-lg"
+                  >
+                    <span>{view.name}</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={(e) => toggleMenu(view.id, e)}
-                    className={`ml-0.5 p-0.5 rounded ${
+                    aria-label={`${view.name}视图操作`}
+                    className={`mr-1 p-0.5 rounded ${
                       activeViewId === view.id
                         ? 'hover:bg-white/20 text-white/80'
                         : 'hover:bg-clay-100 text-ink-400'
@@ -173,9 +180,9 @@ export function FilterBar({
                   >
                     <MoreHorizontal className="w-3.5 h-3.5" />
                   </button>
-                </button>
+                </div>
               )}
-              
+
               {openMenuId === view.id && (
                 <>
                   <div
@@ -202,7 +209,7 @@ export function FilterBar({
               )}
             </div>
           ))}
-          
+
           <button
             onClick={handleOpenSaveDialog}
             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium text-brass-600 bg-brass-50 border border-brass-200 hover:bg-brass-100 transition-colors"
@@ -218,9 +225,9 @@ export function FilterBar({
         <div className="flex items-center gap-2 mb-4 flex-wrap">
           <Filter className="w-5 h-5 text-clay-500" />
           <span className="font-semibold text-ink-500">筛选记录</span>
-          
+
           <div className="mx-3 h-6 w-px bg-clay-200" />
-          
+
           <button
             onClick={onOpenWorkbench}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brass-500 text-white text-sm font-medium hover:bg-brass-600 transition-colors"
@@ -228,7 +235,7 @@ export function FilterBar({
             <ListTodo className="w-4 h-4" />
             <span>调音工作台</span>
           </button>
-          
+
           {views.length === 0 && hasActiveFilters && (
             <button
               onClick={handleOpenSaveDialog}
@@ -238,7 +245,7 @@ export function FilterBar({
               保存为视图
             </button>
           )}
-          
+
           {hasActiveFilters && (
             <button
               onClick={handleClear}
@@ -249,7 +256,7 @@ export function FilterBar({
             </button>
           )}
         </div>
-        
+
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1">
             <label className="block text-sm text-ink-400 mb-1.5">搜索</label>
@@ -264,7 +271,7 @@ export function FilterBar({
               />
             </div>
           </div>
-          
+
           <div className="flex-1">
             <label className="block text-sm text-ink-400 mb-1.5">调式</label>
             <select
@@ -280,7 +287,7 @@ export function FilterBar({
               ))}
             </select>
           </div>
-          
+
           <div className="flex-1">
             <label className="block text-sm text-ink-400 mb-1.5">交付状态</label>
             <select

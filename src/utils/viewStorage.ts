@@ -24,7 +24,7 @@ export const saveViews = (views: FilterView[]): void => {
 export const addView = (name: string, filters: FilterState): FilterView => {
   const views = getViews();
   const now = new Date().toISOString();
-  
+
   const newView: FilterView = {
     id: generateViewId(),
     name,
@@ -32,7 +32,7 @@ export const addView = (name: string, filters: FilterState): FilterView => {
     createdAt: now,
     updatedAt: now,
   };
-  
+
   views.push(newView);
   saveViews(views);
   return newView;
@@ -42,14 +42,14 @@ export const updateView = (id: string, updates: Partial<Omit<FilterView, 'id' | 
   const views = getViews();
   const index = views.findIndex(v => v.id === id);
   if (index === -1) return null;
-  
+
   const now = new Date().toISOString();
   views[index] = {
     ...views[index],
     ...updates,
     updatedAt: now,
   };
-  
+
   saveViews(views);
   return views[index];
 };
