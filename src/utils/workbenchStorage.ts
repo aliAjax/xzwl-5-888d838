@@ -141,15 +141,11 @@ export const removeTasksByRecordId = (recordId: string): number => {
   return removedCount;
 };
 
-export const cleanupInvalidTasks = (validRecordIds: string[], deliveredRecordIds?: string[]): number => {
+export const cleanupInvalidTasks = (validRecordIds: string[], deliveredRecordIds: string[] = []): number => {
   const tasks = getWorkbenchTasks();
   const validIdSet = new Set(validRecordIds);
-  const deliveredIdSet = deliveredRecordIds ? new Set(deliveredRecordIds) : null;
-  const filtered = tasks.filter(t => {
-    if (!validIdSet.has(t.recordId)) return false;
-    if (deliveredIdSet && deliveredIdSet.has(t.recordId)) return false;
-    return true;
-  });
+  const deliveredIdSet = new Set(deliveredRecordIds);
+  const filtered = tasks.filter(t => validIdSet.has(t.recordId) && !deliveredIdSet.has(t.recordId));
   const removedCount = tasks.length - filtered.length;
   if (removedCount > 0) {
     saveWorkbenchTasks(filtered);

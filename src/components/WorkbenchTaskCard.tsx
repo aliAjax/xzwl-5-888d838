@@ -11,7 +11,7 @@ interface WorkbenchTaskCardProps {
   onDragStart: (e: React.DragEvent, task: WorkbenchTask) => void;
   onDragEnd: () => void;
   onDragOver: (e: React.DragEvent, taskId: string, status: WorkbenchTaskStatus) => void;
-  onDragLeave: (e: React.DragEvent, taskId: string) => void;
+  onDragLeave?: (e: React.DragEvent, taskId: string) => void;
   isDragging: boolean;
   isInvalid: boolean;
   dropPosition: 'before' | 'after' | null;
@@ -26,7 +26,6 @@ export function WorkbenchTaskCard({
   onDragStart,
   onDragEnd,
   onDragOver,
-  onDragLeave,
   isDragging,
   isInvalid,
   dropPosition,
@@ -48,7 +47,6 @@ export function WorkbenchTaskCard({
         onDragStart={(e) => onDragStart(e, task)}
         onDragEnd={onDragEnd}
         onDragOver={(e) => onDragOver(e, task.id, task.status)}
-        onDragLeave={(e) => onDragLeave(e, task.id)}
         className={`relative bg-red-50 border border-red-200 rounded-xl p-4 mb-3 ${
           isDragging ? 'opacity-50' : ''
         } ${dropPosition ? 'ring-2 ring-brass-400' : ''}`}
@@ -96,7 +94,6 @@ export function WorkbenchTaskCard({
       onDragStart={(e) => onDragStart(e, task)}
       onDragEnd={onDragEnd}
       onDragOver={(e) => onDragOver(e, task.id, task.status)}
-      onDragLeave={(e) => onDragLeave(e, task.id)}
       className={`relative bg-white rounded-xl p-4 mb-3 border border-clay-100 shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing group ${
         isDragging ? 'opacity-50 scale-[0.98]' : ''
       } ${dropPosition ? 'ring-2 ring-brass-400' : ''}`}

@@ -1,7 +1,13 @@
-import { Edit2, Trash2, Calendar, User, Hash, FileText, History, Clock } from 'lucide-react';
+import { Edit2, Trash2, Calendar, User, Hash, FileText, History, Clock, Activity, Target } from 'lucide-react';
 import type { HandpanRecord } from '@/types/record';
-// @ts-ignore
-import { getStatusLabel, getStatusColor, getLatestTuning, getLatestTuningDate, getLatestDeviationNote, getMaxDeviation, getCalibratedCount } from '@/types/record';
+import {
+  getStatusLabel,
+  getStatusColor,
+  getLatestTuning,
+  getLatestTuningDate,
+  getLatestDeviationNote,
+} from '@/types/record';
+import { getMaxDeviation, getCalibratedCount } from '@/types/record';
 
 interface RecordCardProps {
   record: HandpanRecord;
@@ -30,9 +36,21 @@ export function RecordCard({ record, onEdit, onDelete, onGenerateDelivery, onVie
   };
 
   const latestTuning = getLatestTuning(record);
+  const maxDeviation = latestTuning ? getMaxDeviation(latestTuning) : null;
+  const calibratedCount = latestTuning ? getCalibratedCount(latestTuning) : 0;
   const latestTuningDate = getLatestTuningDate(record);
   const latestDeviationNote = getLatestDeviationNote(record);
   const tuningCount = record.tuningHistory?.length || 0;
+
+  const getDeviationColor = (value: number | null) => {
+    if (value === null) return 'text-ink-400';
+    const abs = Math.abs(value);
+    if (abs <= 5) return 'text-green-600';
+    if (abs <= 15) return 'text-amber-600';
+    return 'text-red-600';
+  };
+
+  const hasSummary = maxDeviation !== null || calibratedCount > 0;
 
   return (
     <div
@@ -81,12 +99,27 @@ export function RecordCard({ record, onEdit, onDelete, onGenerateDelivery, onVie
         )}
       </div>
 
+      {hasSummary && (
+        <div className="flex items-center gap-2 text-sm mb-4">
+          {maxDeviation !== null && (
+            <span className={`flex items-center gap-1 font-medium ${getDeviationColor(maxDeviation)}`}>
+              <Activity className="w-4 h-4" />
+              最大偏差 {maxDeviation.toFixed(1)} 音分
+            </span>
+          )}
+          {calibratedCount > 0 && (
+            <span className="flex items-center gap-1 text-ink-500 font-medium">
+              <Target className="w-4 h-4" />
+              已校准 {calibratedCount} 个音位
+            </span>
+          )}
+        </div>
+      )}
+
       {latestDeviationNote && (
         <div className="bg-clay-50 rounded-xl p-3 mb-4 border border-clay-100">
           <p className="text-xs text-ink-400 mb-1">最近偏音说明</p>
-          <p className="text-sm text-ink-500 leading-relaxed">
-            {latestDeviationNote}
-          </p>
+          <p className="text-sm text-ink-600 line-clamp-2">{latestDeviationNote}</p>
         </div>
       )}
 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, ChevronDown, ChevronUp } from 'lucide-react';
 import type { HandpanRecord, DeliveryStatus, TuningRecord } from '@/types/record';
-import { DELIVERY_STATUS_OPTIONS, getLatestTuning } from '@/types/record';
+import { DELIVERY_STATUS_OPTIONS, getLatestTuning, getPhonemeNames } from '@/types/record';
 import { generateId, generateTuningId } from '@/utils/storage';
 import { getModeOptionsForForm } from '@/utils/modeStorage';
 
@@ -22,9 +22,11 @@ export function RecordForm({ isOpen, onClose, onSave, editingRecord }: RecordFor
     deviationNote: '',
     customerNickname: '',
     deliveryStatus: 'pending',
+    phonemeNames: ['Ding', '音位 1', '音位 2', '音位 3', '音位 4', '音位 5', '音位 6', '音位 7', '音位 8'],
   });
 
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
+  const [isPhonemeSectionOpen, setIsPhonemeSectionOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -50,6 +52,7 @@ export function RecordForm({ isOpen, onClose, onSave, editingRecord }: RecordFor
           deviationNote: editingRecord.deviationNote,
           customerNickname: editingRecord.customerNickname,
           deliveryStatus: editingRecord.deliveryStatus,
+          phonemeNames: getPhonemeNames(editingRecord, editingRecord.noteCount),
         });
       } else {
         setFormData({
@@ -60,6 +63,7 @@ export function RecordForm({ isOpen, onClose, onSave, editingRecord }: RecordFor
           deviationNote: '',
           customerNickname: '',
           deliveryStatus: 'pending',
+          phonemeNames: getPhonemeNames({} as HandpanRecord, 9),
         });
       }
       setErrors({});
@@ -130,11 +134,28 @@ export function RecordForm({ isOpen, onClose, onSave, editingRecord }: RecordFor
     onClose();
   };
 
-  const handleChange = (field: keyof Omit<HandpanRecord, 'id' | 'createdAt' | 'updatedAt' | 'tuningHistory'>, value: string | number) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleChange = (field: keyof Omit<HandpanRecord, 'id' | 'createdAt' | 'updatedAt' | 'tuningHistory'>, value: string | number | string[]) => {
+    if (field === 'noteCount') {
+      const count = value as number;
+      setFormData(prev => ({
+        ...prev,
+        noteCount: count,
+        phonemeNames: getPhonemeNames(prev as HandpanRecord, count),
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    }
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: undefined }));
     }
+  };
+
+  const handlePhonemeNameChange = (index: number, value: string) => {
+    setFormData(prev => {
+      const newNames = [...(prev.phonemeNames || [])];
+      newNames[index] = value;
+      return { ...prev, phonemeNames: newNames };
+    });
   };
 
   if (!isOpen) return null;
@@ -283,6 +304,41 @@ export function RecordForm({ isOpen, onClose, onSave, editingRecord }: RecordFor
                 rows={3}
                 className="input-field resize-none"
               />
+            </div>
+
+            <div className="border border-clay-200 rounded-xl overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setIsPhonemeSectionOpen(!isPhonemeSectionOpen)}
+                className="w-full flex items-center justify-between p-4 bg-clay-50 hover:bg-clay-100 transition-colors"
+              >
+                <span className="font-medium text-ink-600">
+                  音位命名 ({formData.noteCount} 个音位)
+                </span>
+                {isPhonemeSectionOpen ? (
+                  <ChevronUp className="w-5 h-5 text-ink-500" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-ink-500" />
+                )}
+              </button>
+              {isPhonemeSectionOpen && (
+                <div className="p-4 space-y-3 max-h-64 overflow-y-auto">
+                  {formData.phonemeNames?.map((name, index) => (
+                    <div key={index} className="flex items-center gap-3">
+                      <span className="text-sm text-ink-400 w-16 font-mono">
+                        {index === 0 ? 'Ding' : `#${index}`}
+                      </span>
+                      <input
+                        type="text"
+                        value={name}
+                        onChange={(e) => handlePhonemeNameChange(index, e.target.value)}
+                        className="input-field flex-1"
+                        placeholder={index === 0 ? 'Ding' : `音位 ${index}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-end gap-3 pt-4 border-t border-clay-100">

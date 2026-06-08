@@ -57,8 +57,7 @@ export function TuningWorkbench({
 
   const runCleanup = () => {
     const validRecordIds = records.map(r => r.id);
-    const deliveredRecordIds = records.filter(r => r.deliveryStatus === 'delivered').map(r => r.id);
-    const removed = cleanupInvalidTasks(validRecordIds, deliveredRecordIds);
+    const removed = cleanupInvalidTasks(validRecordIds);
     setCleanupCount(removed);
     if (removed > 0) {
       loadTasks();
@@ -135,19 +134,6 @@ export function TuningWorkbench({
 
     if (!dropTarget || dropTarget.taskId !== taskId || dropTarget.position !== position) {
       setDropTarget({ taskId, position });
-    }
-  };
-
-  const handleDragLeaveTask = (e: React.DragEvent, taskId: string) => {
-    e.preventDefault();
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const x = e.clientX;
-    const y = e.clientY;
-    
-    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
-      if (dropTarget && dropTarget.taskId === taskId) {
-        setDropTarget(null);
-      }
     }
   };
 
@@ -484,7 +470,6 @@ export function TuningWorkbench({
                             onDragStart={handleDragStart}
                             onDragEnd={handleDragEnd}
                             onDragOver={handleDragOverTask}
-                            onDragLeave={handleDragLeaveTask}
                             isDragging={draggedTask?.id === task.id}
                             isInvalid={isTaskInvalid(task)}
                             dropPosition={
