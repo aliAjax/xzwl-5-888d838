@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import type { HandpanRecord, FilterState, TuningRecord, DeliveryStatus, PhonemeDeviation, FollowUpRecord, FollowUpStatus, RecordConflict, DiffItem, VersionedBackup, ModeOption, FilterView, DeliveryChecklist, ImportPreviewResult, ImportModuleOptions } from "@/types/record";
+import type { HandpanRecord, FilterState, TuningRecord, DeliveryStatus, PhonemeDeviation, FollowUpRecord, FollowUpStatus, RecordConflict, DiffItem, ModeOption, FilterView, DeliveryChecklist, ImportPreviewResult, ImportModuleOptions } from "@/types/record";
 import { DEFAULT_MODE_OPTIONS } from "@/types/record";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { Header } from "@/components/Header";
@@ -22,7 +22,7 @@ import { BackupRestoreManager } from "@/components/BackupRestoreManager";
 import { parseImportData, analyzeImportData, mergeImportedRecords, migrateRecords, generateTuningId, addFollowUpRecord, updateFollowUpStatus, deleteFollowUpRecord, type ImportAnalysis, getRecords } from "@/utils/storage";
 import { getModes, saveModes } from "@/utils/modeStorage";
 import { getWorkbenchTasks, saveWorkbenchTasks, removeTasksByRecordId, cleanupInvalidTasks } from "@/utils/workbenchStorage";
-import { parseBackup, isVersionedBackup, analyzeDiff, applyResolutions, getLocalData, saveTombstones, createImportPreview, applyResolutionsWithModuleOptions } from "@/utils/versionedBackup";
+import { parseBackup, isVersionedBackup, getLocalData, saveTombstones, createImportPreview, applyResolutionsWithModuleOptions } from "@/utils/versionedBackup";
 import { getViews, addView, deleteView, renameView, getViewById } from "@/utils/viewStorage";
 
 const STORAGE_KEY = "handpan_records";
@@ -383,8 +383,7 @@ function App() {
     const result = applyResolutionsWithModuleOptions(
       localData,
       resolvedDiffs,
-      moduleOptions,
-      importPreview.importedBackup
+      moduleOptions
     );
 
     setRecords(result.records);

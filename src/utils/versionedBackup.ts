@@ -248,6 +248,35 @@ const detectEntityDiffs = (
   return diffs;
 };
 
+const detectTombstoneDiffs = (
+  localTombstones: Tombstone[],
+  importedTombstones: Tombstone[]
+): DiffItem[] => {
+  const diffs: DiffItem[] = [];
+  const localMap = new Map(
+    localTombstones.map((t) => [`${t.entityType}:${t.id}`, t])
+  );
+  const importedMap = new Map(
+    importedTombstones.map((t) => [`${t.entityType}:${t.id}`, t])
+  );
+
+  for (const [key, imported] of importedMap) {
+    if (!localMap.has(key)) {
+      const [entityType, id] = key.split(':');
+      diffs.push({
+        id,
+        entityType: entityType as 'record' | 'mode' | 'workbenchTask',
+        changeType: 'new',
+        imported,
+        resolution: 'keep-imported',
+        fieldConflicts: ['tombstone'],
+      });
+    }
+  }
+
+  return diffs;
+};
+
 export const analyzeDiff = (
   localData: {
     records: HandpanRecord[];
@@ -281,7 +310,12 @@ export const analyzeDiff = (
     'workbenchTask'
   );
 
-  return [...recordDiffs, ...modeDiffs, ...taskDiffs];
+  const tombstoneDiffs = detectTombstoneDiffs(
+    localData.tombstones,
+    importedBackup.tombstones
+  );
+
+  return [...recordDiffs, ...modeDiffs, ...taskDiffs, ...tombstoneDiffs];
 };
 
 export const applyResolutions = (
@@ -317,6 +351,10 @@ export const applyResolutions = (
               deletedAt: new Date().toISOString(),
               deletedBy: getDeviceId(),
             });
+          }
+        } else if (diff.fieldConflicts?.includes('tombstone') && diff.imported) {
+          if (!localTombstoneSet.has(key)) {
+            newTombstones.push(diff.imported);
           }
         } else if (diff.imported) {
           if (diff.entityType === 'record') localRecordMap.set(diff.id, diff.imported);
@@ -455,12 +493,28 @@ export const calculateModuleStats = (
   });
 
   diffs.forEach((diff) => {
-    const moduleType = ENTITY_TYPE_TO_MODULE_TYPE[diff.entityType];
-    const stats = moduleStatsMap.get(moduleType);
-    if (stats) {
-      stats.total++;
-      const statsKey = DIFF_CHANGE_TYPE_TO_MODULE_STATS[diff.changeType];
-      stats[statsKey]++;
+    if (diff.fieldConflicts?.includes('tombstone')) {
+      const tombstoneStats = moduleStatsMap.get('tombstones');
+      if (tombstoneStats) {
+        tombstoneStats.total++;
+        tombstoneStats.added++;
+      }
+    } else if (diff.changeType === 'deleted' || 
+               (diff.changeType === 'conflict' && diff.fieldConflicts?.includes('deleted'))) {
+      const tombstoneStats = moduleStatsMap.get('tombstones');
+      if (tombstoneStats) {
+        tombstoneStats.total++;
+        const statsKey = DIFF_CHANGE_TYPE_TO_MODULE_STATS[diff.changeType];
+        tombstoneStats[statsKey]++;
+      }
+    } else {
+      const moduleType = ENTITY_TYPE_TO_MODULE_TYPE[diff.entityType];
+      const stats = moduleStatsMap.get(moduleType);
+      if (stats) {
+        stats.total++;
+        const statsKey = DIFF_CHANGE_TYPE_TO_MODULE_STATS[diff.changeType];
+        stats[statsKey]++;
+      }
     }
   });
 
@@ -473,25 +527,12 @@ export const calculateModuleStats = (
       importedBackup.tombstones.map((t) => [`${t.entityType}:${t.id}`, t])
     );
 
-    const allTombstoneKeys = new Set([
-      ...localTombstoneMap.keys(),
-      ...importedTombstoneMap.keys(),
-    ]);
-
-    allTombstoneKeys.forEach((key) => {
-      const local = localTombstoneMap.get(key);
-      const imported = importedTombstoneMap.get(key);
-
-      tombstoneStats.total++;
-
-      if (local && imported) {
+    for (const [key] of localTombstoneMap) {
+      if (importedTombstoneMap.has(key)) {
+        tombstoneStats.total++;
         tombstoneStats.unchanged++;
-      } else if (imported && !local) {
-        tombstoneStats.added++;
-      } else if (local && !imported) {
-        tombstoneStats.deleted++;
       }
-    });
+    }
   }
 
   return Array.from(moduleStatsMap.values());
@@ -502,6 +543,15 @@ export const filterDiffsByModuleOptions = (
   moduleOptions: ImportModuleOptions
 ): DiffItem[] => {
   return diffs.filter((diff) => {
+    if (diff.fieldConflicts?.includes('tombstone')) {
+      return moduleOptions.tombstones;
+    }
+    
+    if (diff.changeType === 'deleted' || 
+        (diff.changeType === 'conflict' && diff.fieldConflicts?.includes('deleted'))) {
+      return moduleOptions.tombstones;
+    }
+    
     const moduleType = ENTITY_TYPE_TO_MODULE_TYPE[diff.entityType];
     return moduleOptions[moduleType];
   });
@@ -545,9 +595,9 @@ export const createImportPreview = (
     warnings.push(`检测到 ${orphanedTaskCount} 个工作台任务引用了不存在的记录，导入后将自动清理。`);
   }
 
-  const recordModuleStats = moduleStats.find((s) => s.moduleType === 'records');
-  if (recordModuleStats && recordModuleStats.deleted > 0) {
-    warnings.push(`将删除 ${recordModuleStats.deleted} 条调音记录，请确认这是您预期的操作。`);
+  const tombstoneModuleStats = moduleStats.find((s) => s.moduleType === 'tombstones');
+  if (tombstoneModuleStats && tombstoneModuleStats.deleted > 0) {
+    warnings.push(`将删除 ${tombstoneModuleStats.deleted} 条数据，请确认这是您预期的操作。`);
   }
 
   return {
@@ -562,42 +612,8 @@ export const createImportPreview = (
 export const applyResolutionsWithModuleOptions = (
   localData: ReturnType<typeof getLocalData>,
   diffs: DiffItem[],
-  moduleOptions: ImportModuleOptions,
-  importedBackup: VersionedBackup
+  moduleOptions: ImportModuleOptions
 ): MergeResult => {
   const filteredDiffs = filterDiffsByModuleOptions(diffs, moduleOptions);
-
-  const tombstoneDiffs: DiffItem[] = [];
-  if (moduleOptions.tombstones) {
-    const localTombstoneMap = new Map(
-      localData.tombstones.map((t) => [`${t.entityType}:${t.id}`, t])
-    );
-    const importedTombstoneMap = new Map(
-      importedBackup.tombstones.map((t) => [`${t.entityType}:${t.id}`, t])
-    );
-
-    const allTombstoneKeys = new Set([
-      ...localTombstoneMap.keys(),
-      ...importedTombstoneMap.keys(),
-    ]);
-
-    allTombstoneKeys.forEach((key) => {
-      const [entityType, id] = key.split(':');
-      const local = localTombstoneMap.get(key);
-      const imported = importedTombstoneMap.get(key);
-
-      if (imported && !local) {
-        tombstoneDiffs.push({
-          id,
-          entityType: entityType as 'record' | 'mode' | 'workbenchTask',
-          changeType: 'new',
-          imported,
-          resolution: 'keep-imported',
-        });
-      }
-    });
-  }
-
-  const allDiffsToApply = [...filteredDiffs, ...tombstoneDiffs];
-  return applyResolutions(localData, allDiffsToApply);
+  return applyResolutions(localData, filteredDiffs);
 };

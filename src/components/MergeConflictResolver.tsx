@@ -27,7 +27,6 @@ import {
 import type {
   DiffItem,
   ConflictResolution,
-  VersionedBackup,
   HandpanRecord,
   ImportModuleType,
   ModuleStats,
@@ -111,6 +110,7 @@ const FIELD_LABELS: Record<string, string> = {
   beforeStatus: '调整前状态',
   afterStatus: '调整后状态',
   date: '日期',
+  tombstone: '墓碑记录',
 };
 
 const formatValue = (value: any): string => {
@@ -121,6 +121,14 @@ const formatValue = (value: any): string => {
 };
 
 const getEntityTitle = (diff: DiffItem): string => {
+  if (diff.fieldConflicts?.includes('tombstone')) {
+    const entity = diff.imported;
+    if (entity) {
+      const typeLabel = ENTITY_TYPE_LABELS[diff.entityType] || '未知';
+      return `${typeLabel}删除记录 - ${diff.id.slice(0, 12)}`;
+    }
+  }
+
   const entity = diff.local || diff.imported;
   if (!entity) return `ID: ${diff.id}`;
 
@@ -184,18 +192,6 @@ export function MergeConflictResolver({
     }
   }, [importPreview]);
 
-  const stats = useMemo(() => {
-    return {
-      total: diffs.length,
-      new: diffs.filter(d => d.changeType === 'new').length,
-      modified: diffs.filter(d => d.changeType === 'modified').length,
-      deleted: diffs.filter(d => d.changeType === 'deleted').length,
-      conflict: diffs.filter(d => d.changeType === 'conflict').length,
-      unchanged: diffs.filter(d => d.changeType === 'unchanged').length,
-      pending: diffs.filter(d => d.resolution === 'pending').length,
-    };
-  }, [diffs]);
-
   const filteredDiffs = useMemo(() => {
     const moduleFiltered = filterDiffsByModuleOptions(diffs, moduleOptions);
     
@@ -203,6 +199,18 @@ export function MergeConflictResolver({
     if (filter === 'pending') return moduleFiltered.filter(d => d.resolution === 'pending');
     return moduleFiltered.filter(d => d.changeType === filter);
   }, [diffs, filter, moduleOptions]);
+
+  const stats = useMemo(() => {
+    return {
+      total: filteredDiffs.length,
+      new: filteredDiffs.filter(d => d.changeType === 'new').length,
+      modified: filteredDiffs.filter(d => d.changeType === 'modified').length,
+      deleted: filteredDiffs.filter(d => d.changeType === 'deleted').length,
+      conflict: filteredDiffs.filter(d => d.changeType === 'conflict').length,
+      unchanged: filteredDiffs.filter(d => d.changeType === 'unchanged').length,
+      pending: filteredDiffs.filter(d => d.resolution === 'pending').length,
+    };
+  }, [filteredDiffs]);
 
   const selectedModuleStats = useMemo(() => {
     if (!importPreview) return [];
@@ -328,8 +336,13 @@ export function MergeConflictResolver({
     }`;
   };
 
-  const getModuleStatsForEntityType = (entityType: DiffItem['entityType']): ModuleStats | undefined => {
-    const moduleType = getModuleFromEntityType(entityType);
+  const getModuleStatsForDiff = (diff: DiffItem): ModuleStats | undefined => {
+    if (diff.fieldConflicts?.includes('tombstone') ||
+        diff.changeType === 'deleted' ||
+        (diff.changeType === 'conflict' && diff.fieldConflicts?.includes('deleted'))) {
+      return importPreview.moduleStats.find(s => s.moduleType === 'tombstones');
+    }
+    const moduleType = getModuleFromEntityType(diff.entityType);
     return importPreview.moduleStats.find(s => s.moduleType === moduleType);
   };
 
@@ -555,34 +568,27 @@ export function MergeConflictResolver({
               <div className="px-6 py-4 border-b border-clay-100 flex-shrink-0">
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
                   <div className="bg-clay-50 rounded-xl p-3 text-center">
-                    <div className="text-2xl font-bold text-ink-500">{filteredDiffs.length}</div>
+                    <div className="text-2xl font-bold text-ink-500">{stats.total}</div>
                     <div className="text-xs text-ink-400 mt-1">总变更</div>
                   </div>
                   <div className="bg-emerald-50 rounded-xl p-3 text-center">
-                    <div className="text-2xl font-bold text-emerald-600">
-                      {filteredDiffs.filter(d => d.changeType === 'new').length}
-                    </div>
+                    <div className="text-2xl font-bold text-emerald-600">{stats.new}</div>
                     <div className="text-xs text-emerald-600 mt-1">新增</div>
                   </div>
                   <div className="bg-blue-50 rounded-xl p-3 text-center">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {filteredDiffs.filter(d => d.changeType === 'modified').length}
-                    </div>
+                    <div className="text-2xl font-bold text-blue-600">{stats.modified}</div>
                     <div className="text-xs text-blue-600 mt-1">修改</div>
                   </div>
                   <div className="bg-red-50 rounded-xl p-3 text-center">
-                    <div className="text-2xl font-bold text-red-600">
-                      {filteredDiffs.filter(d => d.changeType === 'deleted').length}
-                    </div>
+                    <div className="text-2xl font-bold text-red-600">{stats.deleted}</div>
                     <div className="text-xs text-red-600 mt-1">删除</div>
                   </div>
                   <div className="bg-amber-50 rounded-xl p-3 text-center">
                     <div className="text-2xl font-bold text-amber-600">
-                      {selectedModulePendingCount > 0 ? selectedModulePendingCount : 
-                       filteredDiffs.filter(d => d.changeType === 'conflict').length}
+                      {stats.pending > 0 ? stats.pending : stats.conflict}
                     </div>
                     <div className="text-xs text-amber-600 mt-1">
-                      {selectedModulePendingCount > 0 ? '待处理' : '冲突'}
+                      {stats.pending > 0 ? '待处理' : '冲突'}
                     </div>
                   </div>
                 </div>
@@ -641,7 +647,7 @@ export function MergeConflictResolver({
                       const isExpanded = expandedId === diff.id;
                       const Icon = CHANGE_TYPE_ICONS[diff.changeType];
                       const hasConflict = diff.changeType === 'conflict' || diff.resolution === 'pending';
-                      const moduleStats = getModuleStatsForEntityType(diff.entityType);
+                      const moduleStats = getModuleStatsForDiff(diff);
                       const moduleLabel = moduleStats ? IMPORT_MODULE_LABELS[moduleStats.moduleType] : '';
 
                       return (
@@ -711,7 +717,41 @@ export function MergeConflictResolver({
 
                           {isExpanded && (
                             <div className="border-t border-clay-200 p-4">
-                              {diff.changeType === 'new' && (
+                              {diff.changeType === 'new' && diff.fieldConflicts?.includes('tombstone') && (
+                                <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
+                                  <h4 className="text-sm font-medium text-purple-700 mb-3 flex items-center gap-2">
+                                    <Skull className="w-4 h-4" />
+                                    删除墓碑（新增）
+                                  </h4>
+                                  <div className="text-sm text-purple-600 space-y-2">
+                                    <p>
+                                      <span className="font-medium">实体类型：</span>
+                                      {ENTITY_TYPE_LABELS[diff.entityType] || '未知'}
+                                    </p>
+                                    <p>
+                                      <span className="font-medium">实体ID：</span>
+                                      {diff.imported?.id || diff.id}
+                                    </p>
+                                    <p>
+                                      <span className="font-medium">删除时间：</span>
+                                      {diff.imported?.deletedAt 
+                                        ? new Date(diff.imported.deletedAt).toLocaleString()
+                                        : '未知'}
+                                    </p>
+                                    <p>
+                                      <span className="font-medium">删除设备：</span>
+                                      {diff.imported?.deletedBy 
+                                        ? diff.imported.deletedBy.slice(0, 12)
+                                        : '未知'}
+                                    </p>
+                                  </div>
+                                  <p className="text-xs text-purple-500 mt-3">
+                                    此墓碑记录表示该实体在导入设备上已被删除。同步此墓碑可以防止已删除的实体被重新导入。
+                                  </p>
+                                </div>
+                              )}
+
+                              {diff.changeType === 'new' && !diff.fieldConflicts?.includes('tombstone') && (
                                 <div>
                                   <h4 className="text-sm font-medium text-ink-500 mb-3 flex items-center gap-2">
                                     <Plus className="w-4 h-4 text-emerald-500" />
