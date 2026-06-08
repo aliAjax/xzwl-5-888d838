@@ -1,5 +1,25 @@
 export type DeliveryStatus = 'pending' | 'in-progress' | 'completed' | 'delivered';
 
+export type FollowUpStatus = 'pending' | 'contacted' | 'needs-repair' | 'closed';
+
+export interface FollowUpRecord {
+  id: string;
+  recordId: string;
+  contactDate: string;
+  customerFeedback: string;
+  nextFollowUpDate: string | null;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FollowUpData {
+  status: FollowUpStatus;
+  lastContactDate: string | null;
+  nextFollowUpDate: string | null;
+  history: FollowUpRecord[];
+}
+
 export interface PhonemeDeviation {
   name: string;
   beforeDeviation: number | null;
@@ -33,6 +53,7 @@ export interface HandpanRecord {
   updatedAt: string;
   tuningHistory: TuningRecord[];
   phonemeNames?: string[];
+  followUp?: FollowUpData;
 }
 
 export interface FilterState {
@@ -149,56 +170,6 @@ export interface WorkbenchTask {
 export interface WorkbenchData {
   tasks: WorkbenchTask[];
   currentDate: string;
-}
-
-export interface Tombstone {
-  id: string;
-  entityType: 'record' | 'mode' | 'workbenchTask';
-  deletedAt: string;
-  deletedBy: string;
-}
-
-export interface BackupMetadata {
-  version: number;
-  backupFormatVersion: string;
-  deviceId: string;
-  createdAt: string;
-  exportedAt: string;
-  recordCount: number;
-  modeCount: number;
-  workbenchTaskCount: number;
-  tombstoneCount: number;
-}
-
-export interface VersionedBackup {
-  metadata: BackupMetadata;
-  records: HandpanRecord[];
-  modes: ModeOption[];
-  workbenchTasks: WorkbenchTask[];
-  tombstones: Tombstone[];
-}
-
-export type ChangeType = 'new' | 'modified' | 'deleted' | 'conflict' | 'unchanged';
-export type ConflictResolution = 'keep-local' | 'keep-imported' | 'manual' | 'pending';
-
-export interface DiffItem {
-  id: string;
-  entityType: 'record' | 'mode' | 'workbenchTask';
-  changeType: ChangeType;
-  local?: any;
-  imported?: any;
-  base?: any;
-  resolution: ConflictResolution;
-  merged?: any;
-  fieldConflicts?: string[];
-}
-
-export interface MergeResult {
-  records: HandpanRecord[];
-  modes: ModeOption[];
-  workbenchTasks: WorkbenchTask[];
-  tombstones: Tombstone[];
-  diffs: DiffItem[];
 }
 
 export const WORKBENCH_STATUS_OPTIONS: { value: WorkbenchTaskStatus; label: string; color: string }[] = [
@@ -340,5 +311,186 @@ export const createEmptyPhonemeDeviations = (names: string[]): PhonemeDeviation[
     afterDeviation: null,
     remark: "",
   }));
+};
+
+export const FOLLOW_UP_STATUS_OPTIONS: { value: FollowUpStatus; label: string; color: string }[] = [
+  { value: 'pending', label: '待回访', color: 'bg-amber-50 text-amber-700 border-amber-300' },
+  { value: 'contacted', label: '已联系', color: 'bg-blue-50 text-blue-700 border-blue-300' },
+  { value: 'needs-repair', label: '需返修', color: 'bg-rose-50 text-rose-700 border-rose-300' },
+  { value: 'closed', label: '已关闭', color: 'bg-gray-50 text-gray-600 border-gray-300' },
+];
+
+export const getFollowUpStatusLabel = (status: FollowUpStatus): string => {
+  const option = FOLLOW_UP_STATUS_OPTIONS.find(opt => opt.value === status);
+  return option ? option.label : status;
+};
+
+export const getFollowUpStatusColor = (status: FollowUpStatus): string => {
+  const option = FOLLOW_UP_STATUS_OPTIONS.find(opt => opt.value === status);
+  return option ? option.color : 'bg-gray-100 text-gray-600';
+};
+
+export interface FollowUpCategory {
+  status: FollowUpStatus;
+  label: string;
+  description: string;
+  color: string;
+  bgColor: string;
+  borderColor: string;
+  iconColor: string;
+}
+
+export interface FollowUpResult {
+  category: FollowUpCategory;
+  records: HandpanRecord[];
+  count: number;
+}
+
+export const FOLLOW_UP_CATEGORIES: FollowUpCategory[] = [
+  {
+    status: 'pending',
+    label: '待回访',
+    description: '已交付且超过30天未联系',
+    color: 'text-amber-700',
+    bgColor: 'bg-amber-50',
+    borderColor: 'border-amber-300',
+    iconColor: 'text-amber-500',
+  },
+  {
+    status: 'contacted',
+    label: '已联系',
+    description: '30天内有联系记录且状态正常',
+    color: 'text-blue-700',
+    bgColor: 'bg-blue-50',
+    borderColor: 'border-blue-300',
+    iconColor: 'text-blue-500',
+  },
+  {
+    status: 'needs-repair',
+    label: '需返修',
+    description: '客户反馈需要返修处理',
+    color: 'text-rose-700',
+    bgColor: 'bg-rose-50',
+    borderColor: 'border-rose-300',
+    iconColor: 'text-rose-500',
+  },
+  {
+    status: 'closed',
+    label: '已关闭',
+    description: '回访完成，无需继续跟进',
+    color: 'text-gray-600',
+    bgColor: 'bg-gray-50',
+    borderColor: 'border-gray-300',
+    iconColor: 'text-gray-500',
+  },
+];
+
+const PENDING_DAYS_THRESHOLD = 30;
+
+export const getFollowUpStatus = (record: HandpanRecord): FollowUpStatus => {
+  if (record.deliveryStatus !== 'delivered') {
+    return 'pending';
+  }
+
+  const followUp = record.followUp;
+
+  if (!followUp) {
+    const latestTuningDate = getLatestTuningDate(record);
+    const daysSinceTuning = getDaysDiff(latestTuningDate);
+    return daysSinceTuning >= PENDING_DAYS_THRESHOLD ? 'pending' : 'pending';
+  }
+
+  if (followUp.status === 'needs-repair' || followUp.status === 'closed') {
+    return followUp.status;
+  }
+
+  if (followUp.lastContactDate) {
+    const daysSinceContact = getDaysDiff(followUp.lastContactDate);
+    if (daysSinceContact < PENDING_DAYS_THRESHOLD) {
+      return 'contacted';
+    }
+  }
+
+  return 'pending';
+};
+
+export const getNextFollowUpDate = (record: HandpanRecord): string | null => {
+  const followUp = record.followUp;
+  if (!followUp) return null;
+  return followUp.nextFollowUpDate;
+};
+
+export const getLastContactDate = (record: HandpanRecord): string | null => {
+  const followUp = record.followUp;
+  if (!followUp) return null;
+  return followUp.lastContactDate;
+};
+
+export const calculateFollowUpQueue = (records: HandpanRecord[]): FollowUpResult[] => {
+  const pending: HandpanRecord[] = [];
+  const contacted: HandpanRecord[] = [];
+  const needsRepair: HandpanRecord[] = [];
+  const closed: HandpanRecord[] = [];
+
+  records.forEach((record) => {
+    if (record.deliveryStatus !== 'delivered') {
+      return;
+    }
+
+    const status = getFollowUpStatus(record);
+
+    switch (status) {
+      case 'pending':
+        pending.push(record);
+        break;
+      case 'contacted':
+        contacted.push(record);
+        break;
+      case 'needs-repair':
+        needsRepair.push(record);
+        break;
+      case 'closed':
+        closed.push(record);
+        break;
+    }
+  });
+
+  const sortByDate = (a: HandpanRecord, b: HandpanRecord) => {
+    const dateA = getLastContactDate(a) || getLatestTuningDate(a);
+    const dateB = getLastContactDate(b) || getLatestTuningDate(b);
+    return new Date(dateB).getTime() - new Date(dateA).getTime();
+  };
+
+  pending.sort(sortByDate);
+  contacted.sort(sortByDate);
+  needsRepair.sort(sortByDate);
+  closed.sort(sortByDate);
+
+  return [
+    {
+      category: FOLLOW_UP_CATEGORIES[0],
+      records: pending,
+      count: pending.length,
+    },
+    {
+      category: FOLLOW_UP_CATEGORIES[1],
+      records: contacted,
+      count: contacted.length,
+    },
+    {
+      category: FOLLOW_UP_CATEGORIES[2],
+      records: needsRepair,
+      count: needsRepair.length,
+    },
+    {
+      category: FOLLOW_UP_CATEGORIES[3],
+      records: closed,
+      count: closed.length,
+    },
+  ];
+};
+
+export const generateFollowUpId = (): string => {
+  return 'followup-' + Date.now().toString(36) + Math.random().toString(36).substr(2);
 };
 

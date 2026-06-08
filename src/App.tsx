@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import type { HandpanRecord, FilterState, TuningRecord, DeliveryStatus, PhonemeDeviation, DiffItem, VersionedBackup, ModeOption } from "@/types/record";
-import { DEFAULT_MODE_OPTIONS } from "@/types/record";
+import type { HandpanRecord, FilterState, TuningRecord, DeliveryStatus, PhonemeDeviation, FollowUpRecord, FollowUpStatus } from "@/types/record";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { Header } from "@/components/Header";
 import { FilterBar } from "@/components/FilterBar";
@@ -10,15 +9,14 @@ import { RecordForm } from "@/components/RecordForm";
 import { RecordDetail } from "@/components/RecordDetail";
 import { FloatingButton } from "@/components/FloatingButton";
 import { ImportPreview } from "@/components/ImportPreview";
-import { MergeConflictResolver } from "@/components/MergeConflictResolver";
 import { DeliveryOrder } from "@/components/DeliveryOrder";
 import { ModeManager } from "@/components/ModeManager";
 import { TuningWorkbench } from "@/components/TuningWorkbench";
 import { DataHealthCenter } from "@/components/DataHealthCenter";
-import { parseImportData, analyzeImportData, mergeImportedRecords, migrateRecords, generateTuningId, type ImportAnalysis } from "@/utils/storage";
-import { saveModes } from "@/utils/modeStorage";
-import { saveWorkbenchTasks, removeTasksByRecordId, cleanupInvalidTasks } from "@/utils/workbenchStorage";
-import { parseBackup, isVersionedBackup, analyzeDiff, applyResolutions, getLocalData, saveTombstones } from "@/utils/versionedBackup";
+import { FollowUpList } from "@/components/FollowUpList";
+import { FollowUpDetail } from "@/components/FollowUpDetail";
+import { parseImportData, analyzeImportData, mergeImportedRecords, migrateRecords, generateTuningId, addFollowUpRecord, updateFollowUpStatus, deleteFollowUpRecord, type ImportAnalysis } from "@/utils/storage";
+import { removeTasksByRecordId, cleanupInvalidTasks } from "@/utils/workbenchStorage";
 
 const STORAGE_KEY = "handpan_records";
 
@@ -154,16 +152,14 @@ function App() {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [importAnalysis, setImportAnalysis] = useState<ImportAnalysis | null>(null);
   const [importFileName, setImportFileName] = useState("");
-  const [isMergeOpen, setIsMergeOpen] = useState(false);
-  const [mergeDiffs, setMergeDiffs] = useState<DiffItem[]>([]);
-  const [importedBackup, setImportedBackup] = useState<VersionedBackup | null>(null);
-  const [, setModes] = useLocalStorage<ModeOption[]>('handpan_mode_options', DEFAULT_MODE_OPTIONS);
-  const [, setWorkbenchTasks] = useLocalStorage<any[]>('handpan_workbench', []);
   const [isDeliveryOpen, setIsDeliveryOpen] = useState(false);
   const [deliveryRecord, setDeliveryRecord] = useState<HandpanRecord | null>(null);
   const [isModeManagerOpen, setIsModeManagerOpen] = useState(false);
   const [isWorkbenchOpen, setIsWorkbenchOpen] = useState(false);
   const [isDataHealthOpen, setIsDataHealthOpen] = useState(false);
+  const [isFollowUpListOpen, setIsFollowUpListOpen] = useState(false);
+  const [isFollowUpDetailOpen, setIsFollowUpDetailOpen] = useState(false);
+  const [followUpDetailRecord, setFollowUpDetailRecord] = useState<HandpanRecord | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -269,30 +265,12 @@ function App() {
     reader.onload = (event) => {
       try {
         const content = event.target?.result as string;
-        const parsed = parseBackup(content);
-
-        if (isVersionedBackup(parsed)) {
-          const localData = getLocalData();
-          const diffs = analyzeDiff(localData, parsed);
-
-          const hasChanges = diffs.some(d => d.changeType !== 'unchanged');
-          if (!hasChanges) {
-            alert("导入文件与本地数据完全一致，无需同步。");
-            return;
-          }
-
-          setImportedBackup(parsed);
-          setMergeDiffs(diffs);
-          setImportFileName(file.name);
-          setIsMergeOpen(true);
-        } else {
-          const parsedRecords = parseImportData(content);
-          const analysis = analyzeImportData(parsedRecords, records);
-
-          setImportAnalysis(analysis);
-          setImportFileName(file.name);
-          setIsImportOpen(true);
-        }
+        const parsedRecords = parseImportData(content);
+        const analysis = analyzeImportData(parsedRecords, records);
+        
+        setImportAnalysis(analysis);
+        setImportFileName(file.name);
+        setIsImportOpen(true);
       } catch (error) {
         alert(error instanceof Error ? error.message : "文件解析失败，请检查文件格式");
       }
@@ -301,7 +279,7 @@ function App() {
       alert("文件读取失败");
     };
     reader.readAsText(file);
-
+    
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -315,56 +293,18 @@ function App() {
 
   const handleConfirmImport = () => {
     if (!importAnalysis) return;
-
+    
     const mergedRecords = mergeImportedRecords(records, importAnalysis.valid);
     setRecords(mergedRecords);
-
+    
     setTimeout(() => {
       const validIds = mergedRecords.map(r => r.id);
       const deliveredIds = mergedRecords.filter(r => r.deliveryStatus === "delivered").map(r => r.id);
       cleanupInvalidTasks(validIds, deliveredIds);
     }, 0);
-
+    
     alert(`成功导入 ${importAnalysis.valid.length} 条记录`);
     handleCloseImport();
-  };
-
-  const handleCloseMerge = () => {
-    setIsMergeOpen(false);
-    setMergeDiffs([]);
-    setImportedBackup(null);
-    setImportFileName("");
-  };
-
-  const handleConfirmMerge = (resolvedDiffs: DiffItem[]) => {
-    const localData = getLocalData();
-    const result = applyResolutions(localData, resolvedDiffs);
-
-    setRecords(result.records);
-    setModes(result.modes);
-    setWorkbenchTasks(result.workbenchTasks);
-    saveTombstones(result.tombstones);
-
-    setTimeout(() => {
-      saveModes(result.modes);
-      saveWorkbenchTasks(result.workbenchTasks);
-
-      const validIds = result.records.map(r => r.id);
-      const deliveredIds = result.records.filter(r => r.deliveryStatus === "delivered").map(r => r.id);
-      cleanupInvalidTasks(validIds, deliveredIds);
-    }, 0);
-
-    const newCount = resolvedDiffs.filter(d => d.changeType === "new" && d.resolution === "keep-imported").length;
-    const modifiedCount = resolvedDiffs.filter(d => (d.changeType === "modified" || d.changeType === "conflict") && (d.resolution === "keep-imported" || d.resolution === "manual")).length;
-    const deletedCount = resolvedDiffs.filter(d => d.changeType === "deleted" && d.resolution === "keep-imported").length;
-
-    let message = "合并完成！\n";
-    if (newCount > 0) message += `• 新增 ${newCount} 条记录\n`;
-    if (modifiedCount > 0) message += `• 更新 ${modifiedCount} 条记录\n`;
-    if (deletedCount > 0) message += `• 删除 ${deletedCount} 条记录\n`;
-
-    alert(message);
-    handleCloseMerge();
   };
 
   const handleOpenDelivery = (record: HandpanRecord) => {
@@ -405,6 +345,83 @@ function App() {
     setRecords(updatedRecords);
   };
 
+  const handleOpenFollowUpList = () => {
+    setIsFollowUpListOpen(true);
+  };
+
+  const handleCloseFollowUpList = () => {
+    setIsFollowUpListOpen(false);
+  };
+
+  const handleOpenFollowUpDetail = (record: HandpanRecord) => {
+    setFollowUpDetailRecord(record);
+    setIsFollowUpDetailOpen(true);
+  };
+
+  const handleCloseFollowUpDetail = () => {
+    setIsFollowUpDetailOpen(false);
+    setFollowUpDetailRecord(null);
+  };
+
+  const handleAddFollowUp = (
+    recordId: string,
+    data: Omit<FollowUpRecord, 'id' | 'recordId' | 'createdAt' | 'updatedAt'>,
+    status?: FollowUpStatus
+  ) => {
+    const updatedRecord = addFollowUpRecord(recordId, data, status);
+    if (updatedRecord) {
+      setRecords(prev => prev.map(r => r.id === recordId ? updatedRecord : r));
+      if (followUpDetailRecord && followUpDetailRecord.id === recordId) {
+        setFollowUpDetailRecord(updatedRecord);
+      }
+      if (detailRecord && detailRecord.id === recordId) {
+        setDetailRecord(updatedRecord);
+      }
+    }
+  };
+
+  const handleUpdateFollowUpStatus = (recordId: string, status: FollowUpStatus) => {
+    const updatedRecord = updateFollowUpStatus(recordId, status);
+    if (updatedRecord) {
+      setRecords(prev => prev.map(r => r.id === recordId ? updatedRecord : r));
+      if (followUpDetailRecord && followUpDetailRecord.id === recordId) {
+        setFollowUpDetailRecord(updatedRecord);
+      }
+      if (detailRecord && detailRecord.id === recordId) {
+        setDetailRecord(updatedRecord);
+      }
+    }
+  };
+
+  const handleDeleteFollowUp = (recordId: string, followUpId: string) => {
+    const updatedRecord = deleteFollowUpRecord(recordId, followUpId);
+    if (updatedRecord) {
+      setRecords(prev => prev.map(r => r.id === recordId ? updatedRecord : r));
+      if (followUpDetailRecord && followUpDetailRecord.id === recordId) {
+        setFollowUpDetailRecord(updatedRecord);
+      }
+      if (detailRecord && detailRecord.id === recordId) {
+        setDetailRecord(updatedRecord);
+      }
+    }
+  };
+
+  const handleOpenFollowUpDetailFromList = (record: HandpanRecord) => {
+    setIsFollowUpListOpen(false);
+    setTimeout(() => {
+      setFollowUpDetailRecord(record);
+      setIsFollowUpDetailOpen(true);
+    }, 300);
+  };
+
+  const handleOpenTuningHistoryFromFollowUp = (record: HandpanRecord) => {
+    setIsFollowUpDetailOpen(false);
+    setTimeout(() => {
+      setDetailRecord(record);
+      setIsDetailOpen(true);
+    }, 300);
+  };
+
   const handleUpdateRecordStatus = (recordId: string, status: DeliveryStatus) => {
     setRecords(prev => 
       prev.map(r => r.id === recordId ? { ...r, deliveryStatus: status, updatedAt: new Date().toISOString() } : r)
@@ -431,7 +448,7 @@ function App() {
         onChange={handleFileSelect}
         className="hidden"
       />
-      <Header onImportClick={handleImportClick} onModeManagerClick={handleOpenModeManager} onDataHealthClick={handleOpenDataHealth} />
+      <Header onImportClick={handleImportClick} onModeManagerClick={handleOpenModeManager} onDataHealthClick={handleOpenDataHealth} onFollowUpClick={handleOpenFollowUpList} />
       <FilterBar filters={filters} onFilterChange={setFilters} records={records} onOpenWorkbench={handleOpenWorkbench} />
       <TuningReminderBoard records={records} filters={filters} onFilterChange={setFilters} />
       <RecordList 
@@ -456,14 +473,6 @@ function App() {
         analysis={importAnalysis}
         fileName={importFileName}
       />
-      <MergeConflictResolver
-        isOpen={isMergeOpen}
-        onClose={handleCloseMerge}
-        onConfirm={handleConfirmMerge}
-        diffs={mergeDiffs}
-        importedBackup={importedBackup}
-        fileName={importFileName}
-      />
       <DeliveryOrder
         isOpen={isDeliveryOpen}
         onClose={handleCloseDelivery}
@@ -478,6 +487,7 @@ function App() {
         onClose={handleCloseDetail}
         record={detailRecord}
         onAddTuning={handleAddTuning}
+        onViewFollowUp={handleOpenFollowUpDetail}
       />
       <TuningWorkbench
         isOpen={isWorkbenchOpen}
@@ -490,6 +500,22 @@ function App() {
         isOpen={isDataHealthOpen}
         onClose={handleCloseDataHealth}
         onDataRepaired={handleDataRepaired}
+      />
+      <FollowUpList
+        isOpen={isFollowUpListOpen}
+        onClose={handleCloseFollowUpList}
+        records={records}
+        onViewFollowUpDetail={handleOpenFollowUpDetailFromList}
+        onViewTuningHistory={handleOpenTuningHistoryFromFollowUp}
+      />
+      <FollowUpDetail
+        isOpen={isFollowUpDetailOpen}
+        onClose={handleCloseFollowUpDetail}
+        record={followUpDetailRecord}
+        onAddFollowUp={handleAddFollowUp}
+        onUpdateStatus={handleUpdateFollowUpStatus}
+        onDeleteFollowUp={handleDeleteFollowUp}
+        onViewTuningHistory={handleOpenTuningHistoryFromFollowUp}
       />
     </div>
   );

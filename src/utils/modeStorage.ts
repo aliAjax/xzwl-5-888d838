@@ -1,6 +1,5 @@
 import type { ModeOption, HandpanRecord } from '@/types/record';
 import { DEFAULT_MODE_OPTIONS } from '@/types/record';
-import { addTombstone } from './versionedBackup';
 
 const MODE_STORAGE_KEY = 'handpan_mode_options';
 
@@ -156,13 +155,4 @@ export const getModeOptionsForFilter = (records: HandpanRecord[]): { value: stri
 
 export const getDisplayModeName = (modeName: string): string => {
   return modeName;
-};
-
-export const deleteMode = (id: string): boolean => {
-  const modes = getModes();
-  const filtered = modes.filter(m => m.id !== id);
-  if (filtered.length === modes.length) return false;
-  saveModes(filtered);
-  addTombstone(id, 'mode');
-  return true;
 };

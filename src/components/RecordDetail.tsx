@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Calendar, FileText, ArrowRight, Music, Hash, User, Tag, Clock, CheckCircle2, AlertCircle, Activity, Target } from 'lucide-react';
+import { X, Plus, Calendar, FileText, ArrowRight, Music, Hash, User, Tag, Clock, CheckCircle2, AlertCircle, Activity, Target, MessageSquare } from 'lucide-react';
 import type { HandpanRecord, TuningRecord, PhonemeDeviation } from '@/types/record';
-import { compareTuningRecords, getStatusLabel, getStatusColor, getLatestTuning, getPhonemeNames, createEmptyPhonemeDeviations, getMaxDeviation, getCalibratedCount } from '@/types/record';
+import { compareTuningRecords, getStatusLabel, getStatusColor, getLatestTuning, getPhonemeNames, createEmptyPhonemeDeviations, getMaxDeviation, getCalibratedCount, getFollowUpStatus, getFollowUpStatusLabel, getFollowUpStatusColor, getNextFollowUpDate, getLastContactDate } from '@/types/record';
 import { PhonemeDeviationTable } from '@/components/PhonemeDeviationTable';
 
 interface RecordDetailProps {
@@ -9,6 +9,7 @@ interface RecordDetailProps {
   onClose: () => void;
   record: HandpanRecord | null;
   onAddTuning: (recordId: string, tuning: Omit<TuningRecord, 'id' | 'createdAt'>) => void;
+  onViewFollowUp: (record: HandpanRecord) => void;
 }
 
 interface TuningFormData {
@@ -20,7 +21,7 @@ interface TuningFormData {
   phonemeDeviations?: PhonemeDeviation[];
 }
 
-export function RecordDetail({ isOpen, onClose, record, onAddTuning }: RecordDetailProps) {
+export function RecordDetail({ isOpen, onClose, record, onAddTuning, onViewFollowUp }: RecordDetailProps) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [formData, setFormData] = useState<TuningFormData>({
     date: new Date().toISOString().split('T')[0],
@@ -158,7 +159,7 @@ export function RecordDetail({ isOpen, onClose, record, onAddTuning }: RecordDet
           </div>
 
           <div className="p-6 border-b border-clay-100 bg-clay-50/50">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
               <div className="flex items-center gap-2">
                 <Tag className="w-4 h-4 text-ink-400" />
                 <div>
@@ -190,6 +191,41 @@ export function RecordDetail({ isOpen, onClose, record, onAddTuning }: RecordDet
                 </div>
               </div>
             </div>
+
+            {record.deliveryStatus === 'delivered' && (
+              <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-clay-200/50">
+                <div className="flex items-center gap-4 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 text-ink-400" />
+                    <div>
+                      <p className="text-xs text-ink-400">回访状态</p>
+                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${getFollowUpStatusColor(getFollowUpStatus(record))}`}>
+                        {getFollowUpStatusLabel(getFollowUpStatus(record))}
+                      </span>
+                    </div>
+                  </div>
+                  {getLastContactDate(record) && (
+                    <div className="flex items-center gap-1.5 text-sm text-ink-500">
+                      <Calendar className="w-4 h-4 text-ink-400" />
+                      <span>上次联系 {new Date(getLastContactDate(record)!).toLocaleDateString('zh-CN')}</span>
+                    </div>
+                  )}
+                  {getNextFollowUpDate(record) && (
+                    <div className="flex items-center gap-1.5 text-sm text-brass-600">
+                      <Clock className="w-4 h-4" />
+                      <span>下次回访 {new Date(getNextFollowUpDate(record)!).toLocaleDateString('zh-CN')}</span>
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => onViewFollowUp(record)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brass-500 text-white text-sm font-medium hover:bg-brass-600 transition-colors"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  <span>回访详情</span>
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="p-6">

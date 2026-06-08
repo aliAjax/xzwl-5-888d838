@@ -1,5 +1,5 @@
-import type { HandpanRecord, TuningRecord, PhonemeDeviation } from '@/types/record';
-import { addTombstone, createVersionedBackup, isVersionedBackup, parseBackup } from './versionedBackup';
+import type { HandpanRecord, TuningRecord, PhonemeDeviation, FollowUpRecord, FollowUpData, FollowUpStatus } from '@/types/record';
+import { generateFollowUpId, getFollowUpStatus } from '@/types/record';
 
 const STORAGE_KEY = 'handpan_records';
 
@@ -11,11 +11,34 @@ export const generateTuningId = (): string => {
   return 'tuning-' + Date.now().toString(36) + Math.random().toString(36).substr(2);
 };
 
+export const migrateFollowUpData = (data: any): FollowUpData | undefined => {
+  if (!data) return undefined;
+  
+  const migrated: FollowUpData = {
+    status: data.status || 'pending',
+    lastContactDate: data.lastContactDate || null,
+    nextFollowUpDate: data.nextFollowUpDate || null,
+    history: Array.isArray(data.history) ? data.history.map((h: any) => ({
+      id: h.id || generateFollowUpId(),
+      recordId: h.recordId || '',
+      contactDate: h.contactDate || new Date().toISOString().split('T')[0],
+      customerFeedback: h.customerFeedback || '',
+      nextFollowUpDate: h.nextFollowUpDate || null,
+      notes: h.notes || '',
+      createdAt: h.createdAt || new Date().toISOString(),
+      updatedAt: h.updatedAt || new Date().toISOString(),
+    })) : [],
+  };
+
+  return migrated;
+};
+
 export const migrateRecord = (record: any): HandpanRecord => {
   const migrated: HandpanRecord = {
     ...record,
     tuningHistory: record.tuningHistory || [],
     phonemeNames: record.phonemeNames !== undefined ? record.phonemeNames : undefined,
+    followUp: migrateFollowUpData(record.followUp),
   };
 
   if (migrated.tuningHistory.length > 0) {
@@ -131,13 +154,12 @@ export const deleteRecord = (id: string): boolean => {
   const filtered = records.filter(r => r.id !== id);
   if (filtered.length === records.length) return false;
   saveRecords(filtered);
-  addTombstone(id, 'record');
   return true;
 };
 
 export const exportRecords = (): string => {
-  const backup = createVersionedBackup();
-  return JSON.stringify(backup, null, 2);
+  const records = getRecords();
+  return JSON.stringify(records, null, 2);
 };
 
 export const downloadExport = (): void => {
@@ -146,21 +168,7 @@ export const downloadExport = (): void => {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `handpan-backup-${new Date().toISOString().split('T')[0]}.json`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-};
-
-export const downloadLegacyExport = (): void => {
-  const records = getRecords();
-  const dataStr = JSON.stringify(records, null, 2);
-  const blob = new Blob([dataStr], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `handpan-records-${new Date().toISOString().split('T')[0]}-legacy.json`;
+  link.download = `handpan-records-${new Date().toISOString().split('T')[0]}.json`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -218,17 +226,11 @@ export const validateRecord = (record: Partial<HandpanRecord>): { valid: boolean
 };
 
 export const parseImportData = (jsonString: string): Partial<HandpanRecord>[] => {
-  const parsed = parseBackup(jsonString);
-  
-  if (isVersionedBackup(parsed)) {
-    return parsed.records;
+  const parsed = JSON.parse(jsonString);
+  if (!Array.isArray(parsed)) {
+    throw new Error('导入文件格式错误：数据必须是数组格式');
   }
-  
-  if (Array.isArray(parsed)) {
-    return parsed;
-  }
-  
-  throw new Error('导入文件格式错误：无法识别的数据格式');
+  return parsed;
 };
 
 export const analyzeImportData = (
@@ -283,8 +285,202 @@ export const mergeImportedRecords = (
       tuningHistory: migrated.tuningHistory?.length > 0 
         ? migrated.tuningHistory 
         : createInitialTuningHistory(migrated, (record as any).phonemeDeviations),
+      followUp: migrated.followUp,
     };
   });
   
   return [...existingRecords, ...newRecords];
+};
+
+export const initializeFollowUpData = (recordId: string): HandpanRecord | null => {
+  const records = getRecords();
+  const index = records.findIndex(r => r.id === recordId);
+  if (index === -1) return null;
+
+  const now = new Date().toISOString();
+  const followUpData: FollowUpData = {
+    status: 'pending',
+    lastContactDate: null,
+    nextFollowUpDate: null,
+    history: [],
+  };
+
+  records[index] = {
+    ...records[index],
+    followUp: followUpData,
+    updatedAt: now,
+  };
+
+  saveRecords(records);
+  return records[index];
+};
+
+export const addFollowUpRecord = (
+  recordId: string,
+  followUpData: Omit<FollowUpRecord, 'id' | 'recordId' | 'createdAt' | 'updatedAt'>,
+  newStatus?: FollowUpStatus
+): HandpanRecord | null => {
+  const records = getRecords();
+  const index = records.findIndex(r => r.id === recordId);
+  if (index === -1) return null;
+
+  const now = new Date().toISOString();
+  const newFollowUp: FollowUpRecord = {
+    ...followUpData,
+    id: generateFollowUpId(),
+    recordId,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const existingFollowUp = records[index].followUp;
+  const history = existingFollowUp?.history || [];
+  const updatedHistory = [...history, newFollowUp];
+
+  let updatedStatus: FollowUpStatus = newStatus || 'pending';
+  if (!newStatus) {
+    if (followUpData.nextFollowUpDate) {
+      updatedStatus = 'contacted';
+    } else {
+      const tempRecord: HandpanRecord = {
+        ...records[index],
+        followUp: {
+          status: 'pending' as FollowUpStatus,
+          lastContactDate: followUpData.contactDate,
+          nextFollowUpDate: followUpData.nextFollowUpDate,
+          history: updatedHistory,
+        },
+      };
+      updatedStatus = getFollowUpStatus(tempRecord);
+    }
+  }
+
+  const followUp: FollowUpData = {
+    status: updatedStatus,
+    lastContactDate: followUpData.contactDate,
+    nextFollowUpDate: followUpData.nextFollowUpDate,
+    history: updatedHistory,
+  };
+
+  records[index] = {
+    ...records[index],
+    followUp,
+    updatedAt: now,
+  };
+
+  saveRecords(records);
+  return records[index];
+};
+
+export const updateFollowUpStatus = (
+  recordId: string,
+  status: FollowUpStatus
+): HandpanRecord | null => {
+  const records = getRecords();
+  const index = records.findIndex(r => r.id === recordId);
+  if (index === -1) return null;
+
+  const now = new Date().toISOString();
+  const existingFollowUp = records[index].followUp;
+
+  const followUp: FollowUpData = {
+    status,
+    lastContactDate: existingFollowUp?.lastContactDate || null,
+    nextFollowUpDate: existingFollowUp?.nextFollowUpDate || null,
+    history: existingFollowUp?.history || [],
+  };
+
+  records[index] = {
+    ...records[index],
+    followUp,
+    updatedAt: now,
+  };
+
+  saveRecords(records);
+  return records[index];
+};
+
+export const updateFollowUpRecord = (
+  recordId: string,
+  followUpId: string,
+  updates: Partial<Omit<FollowUpRecord, 'id' | 'recordId' | 'createdAt'>>
+): HandpanRecord | null => {
+  const records = getRecords();
+  const index = records.findIndex(r => r.id === recordId);
+  if (index === -1) return null;
+
+  const existingFollowUp = records[index].followUp;
+  if (!existingFollowUp) return null;
+
+  const now = new Date().toISOString();
+  const historyIndex = existingFollowUp.history.findIndex(h => h.id === followUpId);
+  if (historyIndex === -1) return null;
+
+  const updatedHistory = [...existingFollowUp.history];
+  updatedHistory[historyIndex] = {
+    ...updatedHistory[historyIndex],
+    ...updates,
+    updatedAt: now,
+  };
+
+  const lastContact = updatedHistory.length > 0 
+    ? updatedHistory.reduce((latest, h) => 
+        new Date(h.contactDate) > new Date(latest.contactDate) ? h : latest
+      )
+    : null;
+
+  const followUp: FollowUpData = {
+    ...existingFollowUp,
+    lastContactDate: lastContact?.contactDate || existingFollowUp.lastContactDate,
+    nextFollowUpDate: updates.nextFollowUpDate !== undefined 
+      ? updates.nextFollowUpDate 
+      : existingFollowUp.nextFollowUpDate,
+    history: updatedHistory,
+  };
+
+  records[index] = {
+    ...records[index],
+    followUp,
+    updatedAt: now,
+  };
+
+  saveRecords(records);
+  return records[index];
+};
+
+export const deleteFollowUpRecord = (
+  recordId: string,
+  followUpId: string
+): HandpanRecord | null => {
+  const records = getRecords();
+  const index = records.findIndex(r => r.id === recordId);
+  if (index === -1) return null;
+
+  const existingFollowUp = records[index].followUp;
+  if (!existingFollowUp) return null;
+
+  const now = new Date().toISOString();
+  const updatedHistory = existingFollowUp.history.filter(h => h.id !== followUpId);
+
+  const lastContact = updatedHistory.length > 0
+    ? updatedHistory.reduce((latest, h) =>
+        new Date(h.contactDate) > new Date(latest.contactDate) ? h : latest
+      )
+    : null;
+
+  const followUp: FollowUpData = {
+    ...existingFollowUp,
+    lastContactDate: lastContact?.contactDate || null,
+    nextFollowUpDate: lastContact?.nextFollowUpDate || null,
+    history: updatedHistory,
+  };
+
+  records[index] = {
+    ...records[index],
+    followUp,
+    updatedAt: now,
+  };
+
+  saveRecords(records);
+  return records[index];
 };

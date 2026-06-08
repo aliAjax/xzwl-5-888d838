@@ -1,5 +1,4 @@
 import type { WorkbenchTask, WorkbenchTaskStatus, HandpanRecord } from '@/types/record';
-import { addTombstone } from './versionedBackup';
 
 const WORKBENCH_STORAGE_KEY = 'handpan_workbench';
 
@@ -129,18 +128,15 @@ export const removeTaskFromWorkbench = (taskId: string): boolean => {
   const filtered = tasks.filter(t => t.id !== taskId);
   if (filtered.length === tasks.length) return false;
   saveWorkbenchTasks(filtered);
-  addTombstone(taskId, 'workbenchTask');
   return true;
 };
 
 export const removeTasksByRecordId = (recordId: string): number => {
   const tasks = getWorkbenchTasks();
-  const removedTasks = tasks.filter(t => t.recordId === recordId);
   const filtered = tasks.filter(t => t.recordId !== recordId);
   const removedCount = tasks.length - filtered.length;
   if (removedCount > 0) {
     saveWorkbenchTasks(filtered);
-    removedTasks.forEach(t => addTombstone(t.id, 'workbenchTask'));
   }
   return removedCount;
 };
@@ -149,12 +145,10 @@ export const cleanupInvalidTasks = (validRecordIds: string[], deliveredRecordIds
   const tasks = getWorkbenchTasks();
   const validIdSet = new Set(validRecordIds);
   const deliveredIdSet = new Set(deliveredRecordIds);
-  const removedTasks = tasks.filter(t => !validIdSet.has(t.recordId) || deliveredIdSet.has(t.recordId));
   const filtered = tasks.filter(t => validIdSet.has(t.recordId) && !deliveredIdSet.has(t.recordId));
   const removedCount = tasks.length - filtered.length;
   if (removedCount > 0) {
     saveWorkbenchTasks(filtered);
-    removedTasks.forEach(t => addTombstone(t.id, 'workbenchTask'));
   }
   return removedCount;
 };
