@@ -16,45 +16,39 @@ import type {
 import { getRecords } from './storage';
 import { getModes } from './modeStorage';
 import { getWorkbenchTasks } from './workbenchStorage';
+import { STORAGE_KEYS } from './storageKeys';
+import { dataStore } from './dataStore';
 
-const DEVICE_ID_KEY = 'handpan_device_id';
-const TOMBSTONE_KEY = 'handpan_tombstones';
 const BACKUP_FORMAT_VERSION = '2.0';
-const DATA_VERSION_KEY = 'handpan_data_version';
 
 export const getDeviceId = (): string => {
-  let deviceId = localStorage.getItem(DEVICE_ID_KEY);
+  let deviceId = dataStore.readRawItem(STORAGE_KEYS.DEVICE_ID, null);
   if (!deviceId) {
     deviceId = 'dev-' + Date.now().toString(36) + Math.random().toString(36).substr(2, 10);
-    localStorage.setItem(DEVICE_ID_KEY, deviceId);
+    dataStore.writeRawItem(STORAGE_KEYS.DEVICE_ID, deviceId);
   }
   return deviceId;
 };
 
 export const getDataVersion = (): number => {
-  const version = localStorage.getItem(DATA_VERSION_KEY);
+  const version = dataStore.readRawItem(STORAGE_KEYS.DATA_VERSION, null);
   return version ? parseInt(version, 10) : 1;
 };
 
 export const incrementDataVersion = (): number => {
   const current = getDataVersion();
   const next = current + 1;
-  localStorage.setItem(DATA_VERSION_KEY, next.toString());
+  dataStore.writeRawItem(STORAGE_KEYS.DATA_VERSION, next.toString());
   return next;
 };
 
 export const getTombstones = (): Tombstone[] => {
-  try {
-    const data = localStorage.getItem(TOMBSTONE_KEY);
-    if (!data) return [];
-    return JSON.parse(data);
-  } catch {
-    return [];
-  }
+  const data = dataStore.readItem<Tombstone[]>(STORAGE_KEYS.TOMBSTONES, []);
+  return Array.isArray(data) ? data : [];
 };
 
 export const saveTombstones = (tombstones: Tombstone[]): void => {
-  localStorage.setItem(TOMBSTONE_KEY, JSON.stringify(tombstones));
+  dataStore.writeItem(STORAGE_KEYS.TOMBSTONES, tombstones);
 };
 
 export const addTombstone = (id: string, entityType: 'record' | 'mode' | 'workbenchTask'): void => {
@@ -616,4 +610,31 @@ export const applyResolutionsWithModuleOptions = (
 ): MergeResult => {
   const filteredDiffs = filterDiffsByModuleOptions(diffs, moduleOptions);
   return applyResolutions(localData, filteredDiffs);
+};
+
+export const applyResolutionsAndSave = (
+  localData: ReturnType<typeof getLocalData>,
+  diffs: DiffItem[],
+  moduleOptions: ImportModuleOptions
+): MergeResult => {
+  const result = applyResolutionsWithModuleOptions(localData, diffs, moduleOptions);
+  
+  const dataToWrite: Parameters<typeof dataStore.writeAllData>[0] = {};
+  
+  if (moduleOptions.records) {
+    dataToWrite.records = result.records;
+  }
+  if (moduleOptions.modes) {
+    dataToWrite.modes = result.modes;
+  }
+  if (moduleOptions.workbenchTasks) {
+    dataToWrite.workbenchTasks = result.workbenchTasks;
+  }
+  if (moduleOptions.tombstones) {
+    dataToWrite.tombstones = result.tombstones;
+  }
+  
+  dataStore.writeAllData(dataToWrite);
+  
+  return result;
 };

@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { HandpanRecord } from '@/types/record';
 import { migrateRecord } from '@/utils/storage';
+import { dataStore, type DataChangeEvent } from '@/utils/dataStore';
+import { STORAGE_KEYS, type StorageKey } from '@/utils/storageKeys';
 
 const safeParseJSON = (data: string | null): any => {
   if (!data) return null;
@@ -41,7 +43,13 @@ const safeMigrateRecords = (rawData: any, initialValue: any): HandpanRecord[] =>
   return validRecords.length > 0 ? validRecords : initialValue;
 };
 
+const isKnownStorageKey = (key: string): key is StorageKey => {
+  return Object.values(STORAGE_KEYS).includes(key as StorageKey);
+};
+
 export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((prev: T) => T)) => void] {
+  const isWritingRef = useRef(false);
+
   const [storedValue, setStoredValue] = useState<T>(() => {
     try {
       const item = window.localStorage.getItem(key);
@@ -51,7 +59,7 @@ export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T 
 
       const parsed = safeParseJSON(item);
       
-      if (key === 'handpan_records' && Array.isArray(initialValue) && initialValue.length > 0 && 'id' in initialValue[0]) {
+      if (key === STORAGE_KEYS.RECORDS && Array.isArray(initialValue) && initialValue.length > 0 && 'id' in initialValue[0]) {
         return safeMigrateRecords(parsed, initialValue) as unknown as T;
       }
 
@@ -67,10 +75,21 @@ export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T 
       setStoredValue(prev => {
         const valueToStore = value instanceof Function ? value(prev) : value;
         
-        try {
-          window.localStorage.setItem(key, JSON.stringify(valueToStore));
-        } catch (error) {
-          console.error(`Error setting localStorage key "${key}":`, error);
+        if (isKnownStorageKey(key)) {
+          isWritingRef.current = true;
+          try {
+            dataStore.writeItem(key as StorageKey, valueToStore);
+          } finally {
+            setTimeout(() => {
+              isWritingRef.current = false;
+            }, 0);
+          }
+        } else {
+          try {
+            window.localStorage.setItem(key, JSON.stringify(valueToStore));
+          } catch (error) {
+            console.error(`Error setting localStorage key "${key}":`, error);
+          }
         }
         
         return valueToStore;
@@ -81,10 +100,45 @@ export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T 
   }, [key]);
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(key, JSON.stringify(storedValue));
-    } catch (error) {
-      console.error(`Error setting localStorage key "${key}":`, error);
+    if (!isKnownStorageKey(key)) return;
+
+    const storageKey = key as StorageKey;
+
+    const handleDataChange = (event: DataChangeEvent) => {
+      if (isWritingRef.current) return;
+      
+      if (event.keys.includes(storageKey)) {
+        try {
+          const item = window.localStorage.getItem(key);
+          if (!item) {
+            setStoredValue(initialValue);
+            return;
+          }
+
+          const parsed = safeParseJSON(item);
+          
+          if (key === STORAGE_KEYS.RECORDS && Array.isArray(initialValue) && initialValue.length > 0 && 'id' in initialValue[0]) {
+            setStoredValue(safeMigrateRecords(parsed, initialValue) as unknown as T);
+          } else {
+            setStoredValue(parsed !== null ? parsed : initialValue);
+          }
+        } catch (error) {
+          console.error(`Error syncing localStorage key "${key}":`, error);
+        }
+      }
+    };
+
+    const unsubscribe = dataStore.subscribe(handleDataChange);
+    return unsubscribe;
+  }, [key, initialValue]);
+
+  useEffect(() => {
+    if (!isKnownStorageKey(key)) {
+      try {
+        window.localStorage.setItem(key, JSON.stringify(storedValue));
+      } catch (error) {
+        console.error(`Error setting localStorage key "${key}":`, error);
+      }
     }
   }, [key, storedValue]);
 

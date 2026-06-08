@@ -1,24 +1,18 @@
 import type { FilterView, FilterState } from '@/types/record';
-
-const STORAGE_KEY = 'handpan_filter_views';
+import { STORAGE_KEYS } from './storageKeys';
+import { dataStore } from './dataStore';
 
 export const generateViewId = (): string => {
   return 'view-' + Date.now().toString(36) + Math.random().toString(36).substr(2);
 };
 
 export const getViews = (): FilterView[] => {
-  try {
-    const data = localStorage.getItem(STORAGE_KEY);
-    if (!data) return [];
-    const parsed = JSON.parse(data);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+  const data = dataStore.readItem<FilterView[]>(STORAGE_KEYS.VIEWS, []);
+  return Array.isArray(data) ? data : [];
 };
 
 export const saveViews = (views: FilterView[]): void => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(views));
+  dataStore.writeItem(STORAGE_KEYS.VIEWS, views);
 };
 
 export const addView = (name: string, filters: FilterState): FilterView => {

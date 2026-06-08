@@ -1,8 +1,8 @@
 import type { HandpanRecord, TuningRecord, PhonemeDeviation, FollowUpRecord, FollowUpData, FollowUpStatus, RecordConflict, RecordConflictResolution } from '@/types/record';
 import { generateFollowUpId, getFollowUpStatus } from '@/types/record';
 import { addTombstone, createVersionedBackup } from './versionedBackup';
-
-const STORAGE_KEY = 'handpan_records';
+import { STORAGE_KEYS } from './storageKeys';
+import { dataStore } from './dataStore';
 
 export const generateId = (): string => {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
@@ -71,18 +71,12 @@ export const migrateRecords = (records: any[]): HandpanRecord[] => {
 };
 
 export const getRecords = (): HandpanRecord[] => {
-  try {
-    const data = localStorage.getItem(STORAGE_KEY);
-    if (!data) return [];
-    const parsed = JSON.parse(data);
-    return migrateRecords(parsed);
-  } catch {
-    return [];
-  }
+  const data = dataStore.readItem<HandpanRecord[]>(STORAGE_KEYS.RECORDS, []);
+  return migrateRecords(data || []);
 };
 
 export const saveRecords = (records: HandpanRecord[]): void => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+  dataStore.writeItem(STORAGE_KEYS.RECORDS, records);
 };
 
 export const addRecord = (record: Omit<HandpanRecord, 'id' | 'createdAt' | 'updatedAt' | 'tuningHistory'>): HandpanRecord => {

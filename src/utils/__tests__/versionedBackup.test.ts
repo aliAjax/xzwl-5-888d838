@@ -17,7 +17,10 @@ import {
   applyResolutions,
   hasAnyChanges,
   filterDiffsByModuleOptions,
+  applyResolutionsAndSave,
 } from '../versionedBackup';
+import { dataStore } from '../dataStore';
+import { STORAGE_KEYS } from '../storageKeys';
 import type { HandpanRecord, ModeOption, WorkbenchTask, VersionedBackup } from '@/types/record';
 import { saveRecords } from '../storage';
 import { saveModes } from '../modeStorage';
@@ -575,6 +578,316 @@ describe('versionedBackup utils', () => {
       const filtered = filterDiffsByModuleOptions(diffs, options);
       expect(filtered.length).toBe(2);
       expect(filtered.map(d => d.id)).toEqual(['r1', 't1']);
+    });
+  });
+
+  describe('applyResolutionsAndSave', () => {
+    const createTestRecord = (id: string, overrides: Partial<HandpanRecord> = {}): HandpanRecord => ({
+      id,
+      serialNumber: `HP-${id}`,
+      mode: 'D Kurd',
+      noteCount: 9,
+      lastTuningDate: '2024-01-01',
+      deviationNote: '正常',
+      customerNickname: '客户A',
+      deliveryStatus: 'pending',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z',
+      tuningHistory: [],
+      ...overrides,
+    });
+
+    const createTestMode = (id: string, overrides: Partial<ModeOption> = {}): ModeOption => ({
+      id,
+      name: `调式${id}`,
+      active: true,
+      sortOrder: 0,
+      createdAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z',
+      ...overrides,
+    });
+
+    const createTestTask = (id: string, recordId: string, overrides: Partial<WorkbenchTask> = {}): WorkbenchTask => ({
+      id,
+      recordId,
+      status: 'pending',
+      taskDate: '2024-06-01',
+      sortOrder: 0,
+      createdAt: '2024-06-01T00:00:00.000Z',
+      updatedAt: '2024-06-01T00:00:00.000Z',
+      ...overrides,
+    });
+
+    it('应合并新记录并写入 localStorage', () => {
+      const localData = {
+        records: [] as HandpanRecord[],
+        modes: [] as ModeOption[],
+        workbenchTasks: [] as WorkbenchTask[],
+        tombstones: [],
+      };
+
+      const newRecord = createTestRecord('r1');
+      const diffs = [
+        {
+          id: 'r1',
+          entityType: 'record' as const,
+          changeType: 'new' as const,
+          imported: newRecord,
+          resolution: 'keep-imported' as const,
+        },
+      ];
+
+      const moduleOptions = {
+        records: true,
+        modes: false,
+        workbenchTasks: false,
+        tombstones: false,
+      };
+
+      const result = applyResolutionsAndSave(localData, diffs, moduleOptions);
+
+      expect(result.records.length).toBe(1);
+      expect(result.records[0].id).toBe('r1');
+
+      const storedRecords = JSON.parse(localStorage.getItem(STORAGE_KEYS.RECORDS) || '[]');
+      expect(storedRecords.length).toBe(1);
+      expect(storedRecords[0].id).toBe('r1');
+    });
+
+    it('应根据模块选项只写入启用的模块', () => {
+      const existingMode = createTestMode('m1');
+      const localData = {
+        records: [] as HandpanRecord[],
+        modes: [existingMode],
+        workbenchTasks: [] as WorkbenchTask[],
+        tombstones: [],
+      };
+
+      saveModes([existingMode]);
+
+      const newRecord = createTestRecord('r1');
+      const newMode = createTestMode('m2');
+      const diffs = [
+        {
+          id: 'r1',
+          entityType: 'record' as const,
+          changeType: 'new' as const,
+          imported: newRecord,
+          resolution: 'keep-imported' as const,
+        },
+        {
+          id: 'm2',
+          entityType: 'mode' as const,
+          changeType: 'new' as const,
+          imported: newMode,
+          resolution: 'keep-imported' as const,
+        },
+      ];
+
+      const moduleOptions = {
+        records: true,
+        modes: false,
+        workbenchTasks: false,
+        tombstones: false,
+      };
+
+      const result = applyResolutionsAndSave(localData, diffs, moduleOptions);
+
+      expect(result.records.length).toBe(1);
+      expect(result.modes.length).toBe(1);
+
+      const storedRecords = JSON.parse(localStorage.getItem(STORAGE_KEYS.RECORDS) || '[]');
+      expect(storedRecords.length).toBe(1);
+
+      const storedModes = JSON.parse(localStorage.getItem(STORAGE_KEYS.MODES) || '[]');
+      expect(storedModes.length).toBe(1);
+      expect(storedModes[0].id).toBe('m1');
+    });
+
+    it('应通过 dataStore 触发数据变更事件', () => {
+      const localData = {
+        records: [] as HandpanRecord[],
+        modes: [] as ModeOption[],
+        workbenchTasks: [] as WorkbenchTask[],
+        tombstones: [],
+      };
+
+      const newRecord = createTestRecord('r1');
+      const diffs = [
+        {
+          id: 'r1',
+          entityType: 'record' as const,
+          changeType: 'new' as const,
+          imported: newRecord,
+          resolution: 'keep-imported' as const,
+        },
+      ];
+
+      const moduleOptions = {
+        records: true,
+        modes: false,
+        workbenchTasks: false,
+        tombstones: false,
+      };
+
+      let receivedEvent: any = null;
+      const unsubscribe = dataStore.subscribe((event) => {
+        receivedEvent = event;
+      });
+
+      applyResolutionsAndSave(localData, diffs, moduleOptions);
+
+      expect(receivedEvent).not.toBeNull();
+      expect(receivedEvent.type).toBe('batch');
+      expect(receivedEvent.keys).toContain(STORAGE_KEYS.RECORDS);
+
+      unsubscribe();
+    });
+
+    it('keep-local 策略应保留本地数据不写入', () => {
+      const localRecord = createTestRecord('r1', { customerNickname: '本地客户' });
+      const localData = {
+        records: [localRecord],
+        modes: [] as ModeOption[],
+        workbenchTasks: [] as WorkbenchTask[],
+        tombstones: [],
+      };
+
+      const importedRecord = createTestRecord('r1', { customerNickname: '导入客户', updatedAt: '2024-02-01T00:00:00.000Z' });
+      const diffs = [
+        {
+          id: 'r1',
+          entityType: 'record' as const,
+          changeType: 'conflict' as const,
+          local: localRecord,
+          imported: importedRecord,
+          resolution: 'keep-local' as const,
+          fieldConflicts: ['customerNickname'],
+        },
+      ];
+
+      const moduleOptions = {
+        records: true,
+        modes: false,
+        workbenchTasks: false,
+        tombstones: false,
+      };
+
+      const result = applyResolutionsAndSave(localData, diffs, moduleOptions);
+
+      expect(result.records.length).toBe(1);
+      expect(result.records[0].customerNickname).toBe('本地客户');
+
+      const storedRecords = JSON.parse(localStorage.getItem(STORAGE_KEYS.RECORDS) || '[]');
+      expect(storedRecords[0].customerNickname).toBe('本地客户');
+    });
+
+    it('处理删除冲突时应正确写入墓碑', () => {
+      const localRecord = createTestRecord('r1');
+      const localData = {
+        records: [localRecord],
+        modes: [] as ModeOption[],
+        workbenchTasks: [] as WorkbenchTask[],
+        tombstones: [],
+      };
+
+      const diffs = [
+        {
+          id: 'r1',
+          entityType: 'record' as const,
+          changeType: 'deleted' as const,
+          resolution: 'keep-imported' as const,
+        },
+      ];
+
+      const moduleOptions = {
+        records: true,
+        modes: false,
+        workbenchTasks: false,
+        tombstones: true,
+      };
+
+      const result = applyResolutionsAndSave(localData, diffs, moduleOptions);
+
+      expect(result.records.length).toBe(0);
+      expect(result.tombstones.length).toBe(1);
+      expect(result.tombstones[0].id).toBe('r1');
+
+      const storedRecords = JSON.parse(localStorage.getItem(STORAGE_KEYS.RECORDS) || '[]');
+      expect(storedRecords.length).toBe(0);
+
+      const storedTombstones = JSON.parse(localStorage.getItem(STORAGE_KEYS.TOMBSTONES) || '[]');
+      expect(storedTombstones.length).toBe(1);
+      expect(storedTombstones[0].id).toBe('r1');
+    });
+
+    it('应批量写入多个模块数据', () => {
+      const localData = {
+        records: [] as HandpanRecord[],
+        modes: [] as ModeOption[],
+        workbenchTasks: [] as WorkbenchTask[],
+        tombstones: [],
+      };
+
+      const newRecord = createTestRecord('r1');
+      const newMode = createTestMode('m1');
+      const newTask = createTestTask('t1', 'r1');
+
+      const diffs = [
+        {
+          id: 'r1',
+          entityType: 'record' as const,
+          changeType: 'new' as const,
+          imported: newRecord,
+          resolution: 'keep-imported' as const,
+        },
+        {
+          id: 'm1',
+          entityType: 'mode' as const,
+          changeType: 'new' as const,
+          imported: newMode,
+          resolution: 'keep-imported' as const,
+        },
+        {
+          id: 't1',
+          entityType: 'workbenchTask' as const,
+          changeType: 'new' as const,
+          imported: newTask,
+          resolution: 'keep-imported' as const,
+        },
+      ];
+
+      const moduleOptions = {
+        records: true,
+        modes: true,
+        workbenchTasks: true,
+        tombstones: false,
+      };
+
+      let eventCount = 0;
+      let lastEvent: any = null;
+      const unsubscribe = dataStore.subscribe((event) => {
+        eventCount++;
+        lastEvent = event;
+      });
+
+      applyResolutionsAndSave(localData, diffs, moduleOptions);
+
+      expect(eventCount).toBe(1);
+      expect(lastEvent.type).toBe('batch');
+      expect(lastEvent.keys).toContain(STORAGE_KEYS.RECORDS);
+      expect(lastEvent.keys).toContain(STORAGE_KEYS.MODES);
+      expect(lastEvent.keys).toContain(STORAGE_KEYS.WORKBENCH);
+
+      const storedRecords = JSON.parse(localStorage.getItem(STORAGE_KEYS.RECORDS) || '[]');
+      const storedModes = JSON.parse(localStorage.getItem(STORAGE_KEYS.MODES) || '[]');
+      const storedTasks = JSON.parse(localStorage.getItem(STORAGE_KEYS.WORKBENCH) || '[]');
+
+      expect(storedRecords.length).toBe(1);
+      expect(storedModes.length).toBe(1);
+      expect(storedTasks.length).toBe(1);
+
+      unsubscribe();
     });
   });
 });

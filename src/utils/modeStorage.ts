@@ -1,8 +1,8 @@
 import type { ModeOption, HandpanRecord } from '@/types/record';
 import { DEFAULT_MODE_OPTIONS } from '@/types/record';
 import { addTombstone } from './versionedBackup';
-
-const MODE_STORAGE_KEY = 'handpan_mode_options';
+import { STORAGE_KEYS } from './storageKeys';
+import { dataStore } from './dataStore';
 
 export const generateModeId = (): string => {
   return 'mode-' + Date.now().toString(36) + Math.random().toString(36).substr(2);
@@ -10,9 +10,9 @@ export const generateModeId = (): string => {
 
 export const getModes = (): ModeOption[] => {
   try {
-    const data = localStorage.getItem(MODE_STORAGE_KEY);
+    const data = dataStore.readItem<ModeOption[]>(STORAGE_KEYS.MODES, null);
     if (data) {
-      return JSON.parse(data);
+      return data;
     }
     const initialized = DEFAULT_MODE_OPTIONS.map(mode => ({
       ...mode,
@@ -31,7 +31,7 @@ export const getModes = (): ModeOption[] => {
 };
 
 export const saveModes = (modes: ModeOption[]): void => {
-  localStorage.setItem(MODE_STORAGE_KEY, JSON.stringify(modes));
+  dataStore.writeItem(STORAGE_KEYS.MODES, modes);
 };
 
 export const getActiveModeNames = (): string[] => {

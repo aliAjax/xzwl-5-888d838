@@ -19,13 +19,11 @@ import { FollowUpList } from "@/components/FollowUpList";
 import { FollowUpDetail } from "@/components/FollowUpDetail";
 import { TuningQualityDashboard } from "@/components/TuningQualityDashboard";
 import { BackupRestoreManager } from "@/components/BackupRestoreManager";
-import { parseImportData, analyzeImportData, mergeImportedRecords, migrateRecords, generateTuningId, addFollowUpRecord, updateFollowUpStatus, deleteFollowUpRecord, type ImportAnalysis, getRecords } from "@/utils/storage";
-import { getModes, saveModes } from "@/utils/modeStorage";
-import { getWorkbenchTasks, saveWorkbenchTasks, removeTasksByRecordId, cleanupInvalidTasks } from "@/utils/workbenchStorage";
-import { parseBackup, isVersionedBackup, getLocalData, saveTombstones, createImportPreview, applyResolutionsWithModuleOptions } from "@/utils/versionedBackup";
+import { parseImportData, analyzeImportData, mergeImportedRecords, migrateRecords, generateTuningId, addFollowUpRecord, updateFollowUpStatus, deleteFollowUpRecord, type ImportAnalysis } from "@/utils/storage";
+import { removeTasksByRecordId, cleanupInvalidTasks } from "@/utils/workbenchStorage";
+import { parseBackup, isVersionedBackup, getLocalData, createImportPreview, applyResolutionsAndSave } from "@/utils/versionedBackup";
 import { getViews, addView, deleteView, renameView, getViewById } from "@/utils/viewStorage";
-
-const STORAGE_KEY = "handpan_records";
+import { STORAGE_KEYS } from "@/utils/storageKeys";
 
 const createSampleTuning = (date: string, note: string, before: string, after: string, remark: string, phonemeDeviations?: PhonemeDeviation[]): TuningRecord => ({
   id: generateTuningId(),
@@ -145,7 +143,7 @@ const SAMPLE_RECORDS: HandpanRecord[] = [
 ];
 
 function App() {
-  const [records, setRecords] = useLocalStorage<HandpanRecord[]>(STORAGE_KEY, SAMPLE_RECORDS);
+  const [records, setRecords] = useLocalStorage<HandpanRecord[]>(STORAGE_KEYS.RECORDS, SAMPLE_RECORDS);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<HandpanRecord | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -163,8 +161,8 @@ function App() {
   const [importFileName, setImportFileName] = useState("");
   const [isMergeOpen, setIsMergeOpen] = useState(false);
   const [importPreview, setImportPreview] = useState<ImportPreviewResult | null>(null);
-  const [, setModes] = useLocalStorage<ModeOption[]>('handpan_mode_options', DEFAULT_MODE_OPTIONS);
-  const [, setWorkbenchTasks] = useLocalStorage<any[]>('handpan_workbench', []);
+  const [, _setModes] = useLocalStorage<ModeOption[]>(STORAGE_KEYS.MODES, DEFAULT_MODE_OPTIONS);
+  const [, _setWorkbenchTasks] = useLocalStorage<any[]>(STORAGE_KEYS.WORKBENCH, []);
   const [isDeliveryOpen, setIsDeliveryOpen] = useState(false);
   const [deliveryRecord, setDeliveryRecord] = useState<HandpanRecord | null>(null);
   const [isModeManagerOpen, setIsModeManagerOpen] = useState(false);
@@ -177,15 +175,7 @@ function App() {
   const [isBackupRestoreOpen, setIsBackupRestoreOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const refreshAllData = useCallback(() => {
-    const freshRecords = getRecords();
-    const freshModes = getModes();
-    const freshWorkbenchTasks = getWorkbenchTasks();
-
-    setRecords(freshRecords);
-    setModes(freshModes);
-    setWorkbenchTasks(freshWorkbenchTasks);
-
+  const resetUIState = useCallback(() => {
     setDetailRecord(null);
     setIsDetailOpen(false);
     setFollowUpDetailRecord(null);
@@ -193,11 +183,11 @@ function App() {
     setIsWorkbenchOpen(false);
     setEditingRecord(null);
     setIsFormOpen(false);
-  }, [setRecords, setModes, setWorkbenchTasks]);
+  }, []);
 
   const handleRestoreComplete = useCallback(() => {
-    refreshAllData();
-  }, [refreshAllData]);
+    resetUIState();
+  }, [resetUIState]);
 
   useEffect(() => {
     const migrated = migrateRecords(records);
@@ -380,21 +370,13 @@ function App() {
     if (!importPreview) return;
 
     const localData = getLocalData();
-    const result = applyResolutionsWithModuleOptions(
+    const result = applyResolutionsAndSave(
       localData,
       resolvedDiffs,
       moduleOptions
     );
 
-    setRecords(result.records);
-    setModes(result.modes);
-    setWorkbenchTasks(result.workbenchTasks);
-    saveTombstones(result.tombstones);
-
     setTimeout(() => {
-      saveModes(result.modes);
-      saveWorkbenchTasks(result.workbenchTasks);
-
       const validIds = result.records.map(r => r.id);
       const deliveredIds = result.records.filter(r => r.deliveryStatus === "delivered").map(r => r.id);
       cleanupInvalidTasks(validIds, deliveredIds);

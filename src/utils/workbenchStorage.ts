@@ -1,25 +1,19 @@
 import type { WorkbenchTask, WorkbenchTaskStatus, HandpanRecord } from '@/types/record';
 import { addTombstone } from './versionedBackup';
-
-const WORKBENCH_STORAGE_KEY = 'handpan_workbench';
+import { STORAGE_KEYS } from './storageKeys';
+import { dataStore } from './dataStore';
 
 export const generateWorkbenchId = (): string => {
   return 'wb-' + Date.now().toString(36) + Math.random().toString(36).substr(2);
 };
 
 export const getWorkbenchTasks = (): WorkbenchTask[] => {
-  try {
-    const data = localStorage.getItem(WORKBENCH_STORAGE_KEY);
-    if (!data) return [];
-    const parsed = JSON.parse(data);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+  const data = dataStore.readItem<WorkbenchTask[]>(STORAGE_KEYS.WORKBENCH, []);
+  return Array.isArray(data) ? data : [];
 };
 
 export const saveWorkbenchTasks = (tasks: WorkbenchTask[]): void => {
-  localStorage.setItem(WORKBENCH_STORAGE_KEY, JSON.stringify(tasks));
+  dataStore.writeItem(STORAGE_KEYS.WORKBENCH, tasks);
 };
 
 export const getTasksByDate = (date: string): WorkbenchTask[] => {

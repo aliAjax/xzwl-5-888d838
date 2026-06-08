@@ -10,12 +10,13 @@ import type {
   WorkbenchTask,
   ModeOption,
 } from '@/types/record';
-import { getRecords, saveRecords, migrateRecords } from './storage';
-import { getWorkbenchTasks, saveWorkbenchTasks, cleanupInvalidTasks } from './workbenchStorage';
-import { getModes, saveModes } from './modeStorage';
-import { getTombstones, saveTombstones, getDataVersion } from './versionedBackup';
+import { getRecords, migrateRecords } from './storage';
+import { getWorkbenchTasks, cleanupInvalidTasks } from './workbenchStorage';
+import { getModes } from './modeStorage';
+import { getTombstones, getDataVersion } from './versionedBackup';
+import { STORAGE_KEYS } from './storageKeys';
+import { dataStore } from './dataStore';
 
-const SNAPSHOT_STORAGE_KEY = 'handpan_snapshots';
 const SNAPSHOT_FORMAT_VERSION = '1.0';
 const MAX_SNAPSHOTS = 50;
 
@@ -24,18 +25,12 @@ export const generateSnapshotId = (): string => {
 };
 
 export const getSnapshots = (): LocalSnapshot[] => {
-  try {
-    const data = localStorage.getItem(SNAPSHOT_STORAGE_KEY);
-    if (!data) return [];
-    const parsed = JSON.parse(data);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+  const data = dataStore.readItem<LocalSnapshot[]>(STORAGE_KEYS.SNAPSHOTS, []);
+  return Array.isArray(data) ? data : [];
 };
 
 export const saveSnapshots = (snapshots: LocalSnapshot[]): void => {
-  localStorage.setItem(SNAPSHOT_STORAGE_KEY, JSON.stringify(snapshots));
+  dataStore.writeItem(STORAGE_KEYS.SNAPSHOTS, snapshots);
 };
 
 export const getSnapshotSummaries = (): SnapshotSummary[] => {
@@ -433,13 +428,14 @@ export const restoreFromSnapshot = (
     ? new Set(snapshot.data.records.map(r => r.id))
     : new Set(getRecords().map(r => r.id));
 
+  const dataToWrite: Parameters<typeof dataStore.writeAllData>[0] = {};
+
   if (options.restoreRecords) {
-    const migratedRecords = migrateRecords(snapshot.data.records);
-    saveRecords(migratedRecords);
+    dataToWrite.records = migrateRecords(snapshot.data.records);
   }
 
   if (options.restoreModes) {
-    saveModes(snapshot.data.modes);
+    dataToWrite.modes = snapshot.data.modes;
   }
 
   if (options.restoreWorkbench) {
@@ -449,16 +445,22 @@ export const restoreFromSnapshot = (
       cleanedOrphanedTasks = orphanedCount;
       warnings.push(`自动清理了 ${orphanedCount} 个引用不存在记录的工作台任务。`);
     }
-    saveWorkbenchTasks(validTasks);
+    dataToWrite.workbenchTasks = validTasks;
   } else if (options.restoreRecords) {
-    cleanedOrphanedTasks = cleanupInvalidTasks(Array.from(finalRecordIds));
+    const validIds = Array.from(finalRecordIds);
+    const deliveredIds: string[] = [];
+    cleanedOrphanedTasks = cleanupInvalidTasks(validIds, deliveredIds);
     if (cleanedOrphanedTasks > 0) {
       warnings.push(`自动清理了 ${cleanedOrphanedTasks} 个引用已删除记录的工作台任务。`);
     }
   }
 
   if (options.restoreRecords || options.restoreWorkbench || options.restoreModes) {
-    saveTombstones(snapshot.data.tombstones);
+    dataToWrite.tombstones = snapshot.data.tombstones;
+  }
+
+  if (Object.keys(dataToWrite).length > 0) {
+    dataStore.writeAllData(dataToWrite);
   }
 
   return {
