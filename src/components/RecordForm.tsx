@@ -42,7 +42,7 @@ export function RecordForm({ isOpen, onClose, onSave, editingRecord }: RecordFor
       setModeOptions(allOptions);
 
       const defaultMode = editingRecord?.mode || activeModes[0] || '';
-      
+
       if (editingRecord) {
         setFormData({
           serialNumber: editingRecord.serialNumber,
@@ -58,7 +58,7 @@ export function RecordForm({ isOpen, onClose, onSave, editingRecord }: RecordFor
         const template = getModePhonemeTemplate(defaultMode);
         const initialNoteCount = template ? template.noteCount : 9;
         const initialPhonemeNames = template ? template.phonemeNames : getPhonemeNames({} as HandpanRecord, 9);
-        
+
         setFormData({
           serialNumber: '',
           mode: defaultMode,
@@ -76,7 +76,7 @@ export function RecordForm({ isOpen, onClose, onSave, editingRecord }: RecordFor
 
   const validate = (): boolean => {
     const newErrors: Partial<Record<string, string>> = {};
-    
+
     if (!formData.serialNumber.trim()) {
       newErrors.serialNumber = '请输入编号';
     }
@@ -96,7 +96,7 @@ export function RecordForm({ isOpen, onClose, onSave, editingRecord }: RecordFor
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validate()) return;
 
     const now = new Date().toISOString();
@@ -179,7 +179,7 @@ export function RecordForm({ isOpen, onClose, onSave, editingRecord }: RecordFor
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div 
+      <div
         className="absolute inset-0 bg-ink-900/50 backdrop-blur-sm"
         onClick={onClose}
       />
@@ -248,8 +248,8 @@ export function RecordForm({ isOpen, onClose, onSave, editingRecord }: RecordFor
                       const isActive = getModeOptionsForForm().includes(mode);
                       const hasTemplate = getModePhonemeTemplate(mode) !== null;
                       return (
-                        <option 
-                          key={mode} 
+                        <option
+                          key={mode}
                           value={mode}
                           disabled={!isActive && !isEditingExisting}
                         >
