@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import type { HandpanRecord, FilterState, TuningRecord, DeliveryStatus, PhonemeDeviation, FollowUpRecord, FollowUpStatus, RecordConflict, DiffItem, VersionedBackup, ModeOption } from "@/types/record";
+import type { HandpanRecord, FilterState, TuningRecord, DeliveryStatus, PhonemeDeviation, FollowUpRecord, FollowUpStatus, RecordConflict, DiffItem, VersionedBackup, ModeOption, FilterView } from "@/types/record";
 import { DEFAULT_MODE_OPTIONS } from "@/types/record";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { Header } from "@/components/Header";
@@ -23,6 +23,7 @@ import { parseImportData, analyzeImportData, mergeImportedRecords, migrateRecord
 import { getModes, saveModes } from "@/utils/modeStorage";
 import { getWorkbenchTasks, saveWorkbenchTasks, removeTasksByRecordId, cleanupInvalidTasks } from "@/utils/workbenchStorage";
 import { parseBackup, isVersionedBackup, analyzeDiff, applyResolutions, getLocalData, saveTombstones } from "@/utils/versionedBackup";
+import { getViews, addView, deleteView, renameView, getViewById } from "@/utils/viewStorage";
 
 const STORAGE_KEY = "handpan_records";
 
@@ -155,6 +156,8 @@ function App() {
     search: "",
     reminderType: "",
   });
+  const [views, setViews] = useState<FilterView[]>(getViews());
+  const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [importAnalysis, setImportAnalysis] = useState<ImportAnalysis | null>(null);
   const [importFileName, setImportFileName] = useState("");
@@ -553,6 +556,43 @@ function App() {
     }, 300);
   };
 
+  const handleSaveView = useCallback((name: string) => {
+    const newView = addView(name, filters);
+    setViews(prev => [...prev, newView]);
+    setActiveViewId(newView.id);
+  }, [filters]);
+
+  const handleDeleteView = useCallback((id: string) => {
+    deleteView(id);
+    setViews(prev => prev.filter(v => v.id !== id));
+    if (activeViewId === id) {
+      setActiveViewId(null);
+    }
+  }, [activeViewId]);
+
+  const handleRenameView = useCallback((id: string, name: string) => {
+    const updated = renameView(id, name);
+    if (updated) {
+      setViews(prev => prev.map(v => v.id === id ? updated : v));
+    }
+  }, []);
+
+  const handleSelectView = useCallback((viewId: string | null) => {
+    if (viewId === null) {
+      setActiveViewId(null);
+      return;
+    }
+    const view = getViewById(viewId);
+    if (view) {
+      setFilters(view.filters);
+      setActiveViewId(viewId);
+    }
+  }, []);
+
+  const handleRefreshViews = useCallback(() => {
+    setViews(getViews());
+  }, []);
+
   return (
     <div className="min-h-screen pb-8">
       <input
@@ -563,8 +603,20 @@ function App() {
         className="hidden"
       />
       <Header onImportClick={handleImportClick} onModeManagerClick={handleOpenModeManager} onDataHealthClick={handleOpenDataHealth} onFollowUpClick={handleOpenFollowUpList} onQualityDashboardClick={handleOpenQualityDashboard} onBackupRestoreClick={handleOpenBackupRestore} />
-      <FilterBar filters={filters} onFilterChange={setFilters} records={records} onOpenWorkbench={handleOpenWorkbench} />
-      <TuningReminderBoard records={records} filters={filters} onFilterChange={setFilters} />
+      <FilterBar
+        filters={filters}
+        onFilterChange={setFilters}
+        records={records}
+        onOpenWorkbench={handleOpenWorkbench}
+        views={views}
+        activeViewId={activeViewId}
+        onSaveView={handleSaveView}
+        onDeleteView={handleDeleteView}
+        onRenameView={handleRenameView}
+        onSelectView={handleSelectView}
+        onRefreshViews={handleRefreshViews}
+      />
+      <TuningReminderBoard records={records} filters={filters} onFilterChange={setFilters} onSelectView={handleSelectView} />
       <RecordList 
         records={records} 
         filters={filters} 

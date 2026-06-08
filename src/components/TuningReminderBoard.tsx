@@ -6,6 +6,7 @@ interface TuningReminderBoardProps {
   records: HandpanRecord[];
   filters: FilterState;
   onFilterChange: (filters: FilterState) => void;
+  onSelectView?: (viewId: string | null) => void;
 }
 
 const getIcon = (type: ReminderType) => {
@@ -21,11 +22,12 @@ const getIcon = (type: ReminderType) => {
   }
 };
 
-export function TuningReminderBoard({ records, filters, onFilterChange }: TuningReminderBoardProps) {
+export function TuningReminderBoard({ records, filters, onFilterChange, onSelectView }: TuningReminderBoardProps) {
   const reminders = calculateReminders(records);
   const totalCount = reminders.reduce((sum, r) => sum + r.count, 0);
 
   const handleReminderClick = (type: ReminderType) => {
+    onSelectView?.(null);
     if (filters.reminderType === type) {
       onFilterChange({ ...filters, reminderType: '', deliveryStatus: '' });
     } else {

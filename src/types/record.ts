@@ -83,6 +83,14 @@ export interface FilterState {
   reminderType: ReminderType | '';
 }
 
+export interface FilterView {
+  id: string;
+  name: string;
+  filters: FilterState;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const DELIVERY_STATUS_OPTIONS: { value: DeliveryStatus; label: string; color: string }[] = [
   { value: 'pending', label: '待调音', color: 'bg-gray-100 text-gray-700 border-gray-300' },
   { value: 'in-progress', label: '调音中', color: 'bg-blue-50 text-blue-700 border-blue-300' },
