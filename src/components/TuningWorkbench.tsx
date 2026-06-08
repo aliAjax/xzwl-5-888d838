@@ -57,7 +57,8 @@ export function TuningWorkbench({
 
   const runCleanup = () => {
     const validRecordIds = records.map(r => r.id);
-    const removed = cleanupInvalidTasks(validRecordIds);
+    const deliveredRecordIds = records.filter(r => r.deliveryStatus === 'delivered').map(r => r.id);
+    const removed = cleanupInvalidTasks(validRecordIds, deliveredRecordIds);
     setCleanupCount(removed);
     if (removed > 0) {
       loadTasks();
