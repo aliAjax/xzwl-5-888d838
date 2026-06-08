@@ -10,7 +10,7 @@ import {
   importSnapshot,
   parseSnapshotFile,
 } from '../snapshotStorage';
-import { saveRecords, addRecord } from '../storage';
+import { saveRecords } from '../storage';
 import { saveModes } from '../modeStorage';
 import { saveWorkbenchTasks } from '../workbenchStorage';
 import { saveTombstones, addTombstone } from '../versionedBackup';
@@ -117,8 +117,8 @@ describe('snapshotStorage utils', () => {
 
     it('应获取所有快照', () => {
       setupTestData();
-      const snapshot1 = createSnapshot('快照1');
-      const snapshot2 = createSnapshot('快照2');
+      createSnapshot('快照1');
+      createSnapshot('快照2');
 
       const snapshots = getSnapshots();
       expect(snapshots.length).toBe(2);
@@ -225,7 +225,6 @@ describe('snapshotStorage utils', () => {
       setupTestData();
       const snapshot = createSnapshot('部分恢复快照');
 
-      const originalModes = JSON.parse(localStorage.getItem(STORAGE_KEYS.MODES) || '[]');
       saveRecords([]);
       saveModes([createTestMode('new-mode')]);
       saveWorkbenchTasks([]);

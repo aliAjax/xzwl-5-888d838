@@ -6,6 +6,7 @@ import {
   validateRecord,
   parseImportData,
   analyzeImportData,
+  mergeImportedRecords,
   mergeRecordWithConflict,
   mergeFollowUpData,
   getRecords,
@@ -376,6 +377,91 @@ describe('storage utils', () => {
 
       const result = mergeRecordWithConflict(existing, imported, 'merge');
       expect(result.tuningHistory.length).toBe(2);
+    });
+  });
+
+  describe('mergeImportedRecords', () => {
+    const createImportRecord = (overrides: Partial<HandpanRecord> = {}): HandpanRecord => ({
+      id: 'record-1',
+      serialNumber: 'HP-001',
+      mode: 'D Kurd',
+      noteCount: 9,
+      lastTuningDate: '2024-01-01',
+      deviationNote: '正常',
+      customerNickname: '客户A',
+      deliveryStatus: 'pending',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z',
+      tuningHistory: [],
+      ...overrides,
+    });
+
+    it('普通导入确认时应新增记录并按冲突策略合并已有记录', () => {
+      const existingRecord = createImportRecord({
+        id: 'existing-1',
+        serialNumber: 'HP-001',
+        customerNickname: '本地客户',
+        updatedAt: '2024-01-01T00:00:00.000Z',
+        tuningHistory: [
+          {
+            id: 'tuning-local',
+            date: '2024-01-01',
+            deviationNote: '本地调音',
+            beforeStatus: '',
+            afterStatus: '',
+            remark: '',
+            createdAt: '2024-01-01T00:00:00.000Z',
+          },
+        ],
+      });
+      const importedConflict = createImportRecord({
+        id: 'imported-1',
+        serialNumber: 'HP-001',
+        customerNickname: '导入客户',
+        updatedAt: '2024-02-01T00:00:00.000Z',
+        tuningHistory: [
+          {
+            id: 'tuning-imported',
+            date: '2024-02-01',
+            deviationNote: '导入调音',
+            beforeStatus: '',
+            afterStatus: '',
+            remark: '',
+            createdAt: '2024-02-01T00:00:00.000Z',
+          },
+        ],
+      });
+      const importedNew = createImportRecord({
+        id: 'imported-2',
+        serialNumber: 'HP-002',
+        customerNickname: '新客户',
+      });
+
+      const analysis = analyzeImportData([importedConflict, importedNew], [existingRecord]);
+      const mergedRecords = mergeImportedRecords([existingRecord], analysis.valid, {
+        conflicts: analysis.conflicts.map(conflict => ({
+          ...conflict,
+          resolution: 'merge',
+        })),
+      });
+
+      expect(analysis.valid.map(record => record.serialNumber)).toEqual(['HP-002']);
+      expect(analysis.conflicts.length).toBe(1);
+      expect(mergedRecords.length).toBe(2);
+
+      const mergedConflict = mergedRecords.find(record => record.serialNumber === 'HP-001');
+      expect(mergedConflict).toBeDefined();
+      expect(mergedConflict!.id).toBe('existing-1');
+      expect(mergedConflict!.customerNickname).toBe('导入客户');
+      expect(mergedConflict!.tuningHistory.map(tuning => tuning.id)).toEqual([
+        'tuning-local',
+        'tuning-imported',
+      ]);
+
+      const newRecord = mergedRecords.find(record => record.serialNumber === 'HP-002');
+      expect(newRecord).toBeDefined();
+      expect(newRecord!.customerNickname).toBe('新客户');
+      expect(newRecord!.__version).toBe(1);
     });
   });
 
