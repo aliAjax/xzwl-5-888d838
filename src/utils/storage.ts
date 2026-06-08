@@ -1,5 +1,6 @@
-import type { HandpanRecord, TuningRecord, PhonemeDeviation, FollowUpRecord, FollowUpData, FollowUpStatus, RecordConflict, ConflictResolution } from '@/types/record';
+import type { HandpanRecord, TuningRecord, PhonemeDeviation, FollowUpRecord, FollowUpData, FollowUpStatus, RecordConflict, RecordConflictResolution } from '@/types/record';
 import { generateFollowUpId, getFollowUpStatus } from '@/types/record';
+import { addTombstone, createVersionedBackup } from './versionedBackup';
 
 const STORAGE_KEY = 'handpan_records';
 
@@ -161,12 +162,12 @@ export const deleteRecord = (id: string): boolean => {
   const filtered = records.filter(r => r.id !== id);
   if (filtered.length === records.length) return false;
   saveRecords(filtered);
+  addTombstone(id, 'record');
   return true;
 };
 
 export const exportRecords = (): string => {
-  const records = getRecords();
-  return JSON.stringify(records, null, 2);
+  return JSON.stringify(createVersionedBackup(), null, 2);
 };
 
 export const downloadExport = (): void => {
@@ -362,7 +363,7 @@ export const mergeFollowUpData = (
 export const mergeRecordWithConflict = (
   existingRecord: HandpanRecord,
   importedRecord: HandpanRecord,
-  resolution: ConflictResolution
+  resolution: RecordConflictResolution
 ): HandpanRecord => {
   const now = new Date().toISOString();
   const migratedImported = migrateRecord(importedRecord);

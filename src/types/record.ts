@@ -57,7 +57,7 @@ export interface HandpanRecord {
   __version?: number;
 }
 
-export type ConflictResolution = 'keep-existing' | 'use-imported' | 'merge';
+export type RecordConflictResolution = 'keep-existing' | 'use-imported' | 'merge';
 
 export interface RecordConflict {
   serialNumber: string;
@@ -66,7 +66,7 @@ export interface RecordConflict {
   existingUpdatedAt: string;
   importedUpdatedAt: string;
   isImportedNewer: boolean;
-  resolution: ConflictResolution;
+  resolution: RecordConflictResolution;
 }
 
 export interface ImportConflictAnalysis {
@@ -190,6 +190,56 @@ export interface WorkbenchTask {
 export interface WorkbenchData {
   tasks: WorkbenchTask[];
   currentDate: string;
+}
+
+export interface Tombstone {
+  id: string;
+  entityType: 'record' | 'mode' | 'workbenchTask';
+  deletedAt: string;
+  deletedBy: string;
+}
+
+export interface BackupMetadata {
+  version: number;
+  backupFormatVersion: string;
+  deviceId: string;
+  createdAt: string;
+  exportedAt: string;
+  recordCount: number;
+  modeCount: number;
+  workbenchTaskCount: number;
+  tombstoneCount: number;
+}
+
+export interface VersionedBackup {
+  metadata: BackupMetadata;
+  records: HandpanRecord[];
+  modes: ModeOption[];
+  workbenchTasks: WorkbenchTask[];
+  tombstones: Tombstone[];
+}
+
+export type ChangeType = 'new' | 'modified' | 'deleted' | 'conflict' | 'unchanged';
+export type ConflictResolution = 'keep-local' | 'keep-imported' | 'manual' | 'pending';
+
+export interface DiffItem {
+  id: string;
+  entityType: 'record' | 'mode' | 'workbenchTask';
+  changeType: ChangeType;
+  local?: any;
+  imported?: any;
+  base?: any;
+  resolution: ConflictResolution;
+  merged?: any;
+  fieldConflicts?: string[];
+}
+
+export interface MergeResult {
+  records: HandpanRecord[];
+  modes: ModeOption[];
+  workbenchTasks: WorkbenchTask[];
+  tombstones: Tombstone[];
+  diffs: DiffItem[];
 }
 
 export const WORKBENCH_STATUS_OPTIONS: { value: WorkbenchTaskStatus; label: string; color: string }[] = [
@@ -513,4 +563,3 @@ export const calculateFollowUpQueue = (records: HandpanRecord[]): FollowUpResult
 export const generateFollowUpId = (): string => {
   return 'followup-' + Date.now().toString(36) + Math.random().toString(36).substr(2);
 };
-

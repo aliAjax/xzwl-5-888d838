@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { X, Upload, AlertCircle, CheckCircle, Hash, FileJson, Clock, ArrowRight, GitMerge, Shield, Download } from 'lucide-react';
 import type { ImportAnalysis } from '@/utils/storage';
 import { RecordCard } from './RecordCard';
-import type { RecordConflict, ConflictResolution } from '@/types/record';
+import type { RecordConflict, RecordConflictResolution } from '@/types/record';
 
 interface ImportPreviewProps {
   isOpen: boolean;
@@ -44,7 +44,7 @@ export function ImportPreview({ isOpen, onClose, onConfirm, analysis, fileName }
   const hasConflicts = analysis.conflicts.length > 0;
   const totalToImport = analysis.valid.length + analysis.conflicts.filter(c => c.resolution !== 'keep-existing').length;
 
-  const handleResolutionChange = (index: number, resolution: ConflictResolution) => {
+  const handleResolutionChange = (index: number, resolution: RecordConflictResolution) => {
     const updated = [...localConflicts];
     if (updated.length === 0) {
       updated.push(...analysis.conflicts);
@@ -53,7 +53,7 @@ export function ImportPreview({ isOpen, onClose, onConfirm, analysis, fileName }
     setLocalConflicts(updated);
   };
 
-  const handleSetAllResolution = (resolution: ConflictResolution) => {
+  const handleSetAllResolution = (resolution: RecordConflictResolution) => {
     const updated = analysis.conflicts.map(c => ({ ...c, resolution }));
     setLocalConflicts(updated);
   };
@@ -64,7 +64,7 @@ export function ImportPreview({ isOpen, onClose, onConfirm, analysis, fileName }
     onConfirm(getConflicts());
   };
 
-  const getResolutionLabel = (resolution: ConflictResolution) => {
+  const getResolutionLabel = (resolution: RecordConflictResolution) => {
     switch (resolution) {
       case 'keep-existing': return '保留现有';
       case 'use-imported': return '使用导入';
@@ -72,7 +72,7 @@ export function ImportPreview({ isOpen, onClose, onConfirm, analysis, fileName }
     }
   };
 
-  const getResolutionColor = (resolution: ConflictResolution) => {
+  const getResolutionColor = (resolution: RecordConflictResolution) => {
     switch (resolution) {
       case 'keep-existing': return 'bg-gray-100 text-gray-700 border-gray-200';
       case 'use-imported': return 'bg-blue-100 text-blue-700 border-blue-200';
