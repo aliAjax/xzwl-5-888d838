@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { X, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
-import type { HandpanRecord, DeliveryStatus, TuningRecord } from '@/types/record';
+import { X, ChevronDown, ChevronUp, Sparkles, AlertCircle } from 'lucide-react';
+import type { HandpanRecord, DeliveryStatus, TuningRecord, DeliveryChecklist } from '@/types/record';
 import { DELIVERY_STATUS_OPTIONS, getLatestTuning, getPhonemeNames } from '@/types/record';
 import { generateId, generateTuningId } from '@/utils/storage';
 import { getModeOptionsForForm, getModePhonemeTemplate } from '@/utils/modeStorage';
@@ -11,6 +11,14 @@ interface RecordFormProps {
   onSave: (record: HandpanRecord) => void;
   editingRecord: HandpanRecord | null;
 }
+
+const createEmptyChecklist = (): DeliveryChecklist => ({
+  pitchReview: false,
+  appearanceCheck: false,
+  accessoriesConfirm: false,
+  customerInstructions: false,
+  remark: '',
+});
 
 export function RecordForm({ isOpen, onClose, onSave, editingRecord }: RecordFormProps) {
   const [modeOptions, setModeOptions] = useState<string[]>([]);
@@ -23,10 +31,12 @@ export function RecordForm({ isOpen, onClose, onSave, editingRecord }: RecordFor
     customerNickname: '',
     deliveryStatus: 'pending',
     phonemeNames: ['Ding', '音位 1', '音位 2', '音位 3', '音位 4', '音位 5', '音位 6', '音位 7', '音位 8'],
+    deliveryChecklist: createEmptyChecklist(),
   });
 
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
   const [isPhonemeSectionOpen, setIsPhonemeSectionOpen] = useState(false);
+  const [showDeliveryConfirm, setShowDeliveryConfirm] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -53,6 +63,7 @@ export function RecordForm({ isOpen, onClose, onSave, editingRecord }: RecordFor
           customerNickname: editingRecord.customerNickname,
           deliveryStatus: editingRecord.deliveryStatus,
           phonemeNames: getPhonemeNames(editingRecord, editingRecord.noteCount),
+          deliveryChecklist: editingRecord.deliveryChecklist || createEmptyChecklist(),
         });
       } else {
         const template = getModePhonemeTemplate(defaultMode);
@@ -68,6 +79,7 @@ export function RecordForm({ isOpen, onClose, onSave, editingRecord }: RecordFor
           customerNickname: '',
           deliveryStatus: 'pending',
           phonemeNames: initialPhonemeNames,
+          deliveryChecklist: createEmptyChecklist(),
         });
       }
       setErrors({});
@@ -138,7 +150,7 @@ export function RecordForm({ isOpen, onClose, onSave, editingRecord }: RecordFor
     onClose();
   };
 
-  const handleChange = (field: keyof Omit<HandpanRecord, 'id' | 'createdAt' | 'updatedAt' | 'tuningHistory'>, value: string | number | string[]) => {
+  const handleChange = (field: keyof Omit<HandpanRecord, 'id' | 'createdAt' | 'updatedAt' | 'tuningHistory'>, value: string | number | string[] | DeliveryChecklist) => {
     if (field === 'noteCount') {
       const count = value as number;
       setFormData(prev => ({
@@ -159,12 +171,37 @@ export function RecordForm({ isOpen, onClose, onSave, editingRecord }: RecordFor
       } else {
         setFormData(prev => ({ ...prev, mode: modeName }));
       }
+    } else if (field === 'deliveryStatus') {
+      const newStatus = value as DeliveryStatus;
+      if (newStatus === 'delivered' && editingRecord && editingRecord.deliveryStatus !== 'delivered') {
+        const checklist = formData.deliveryChecklist || createEmptyChecklist();
+        const uncheckedItems = [
+          !checklist.pitchReview && '音准复查',
+          !checklist.appearanceCheck && '外观检查',
+          !checklist.accessoriesConfirm && '配件确认',
+          !checklist.customerInstructions && '客户说明',
+        ].filter(Boolean) as string[];
+        if (uncheckedItems.length > 0) {
+          setShowDeliveryConfirm(true);
+          return;
+        }
+      }
+      setFormData(prev => ({ ...prev, deliveryStatus: newStatus }));
     } else {
       setFormData(prev => ({ ...prev, [field]: value }));
     }
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: undefined }));
     }
+  };
+
+  const handleConfirmDeliveryStatus = () => {
+    setFormData(prev => ({ ...prev, deliveryStatus: 'delivered' }));
+    setShowDeliveryConfirm(false);
+  };
+
+  const handleCancelDeliveryStatus = () => {
+    setShowDeliveryConfirm(false);
   };
 
   const handlePhonemeNameChange = (index: number, value: string) => {
@@ -387,6 +424,60 @@ export function RecordForm({ isOpen, onClose, onSave, editingRecord }: RecordFor
           </form>
         </div>
       </div>
+
+      {showDeliveryConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-scale-in">
+            <div className="bg-amber-50 p-6 border-b border-amber-100">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
+                  <AlertCircle className="w-6 h-6 text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-ink-500">检查清单未完成</h3>
+                  <p className="text-sm text-ink-400">以下项目尚未检查确认</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-6">
+              <ul className="space-y-2 mb-6">
+                {(() => {
+                  const checklist = formData.deliveryChecklist || createEmptyChecklist();
+                  const uncheckedItems = [
+                    !checklist.pitchReview && '音准复查',
+                    !checklist.appearanceCheck && '外观检查',
+                    !checklist.accessoriesConfirm && '配件确认',
+                    !checklist.customerInstructions && '客户说明',
+                  ].filter(Boolean) as string[];
+                  return uncheckedItems.map((item, index) => (
+                    <li key={index} className="flex items-center gap-2 text-ink-600">
+                      <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                      <span>{item}</span>
+                    </li>
+                  ));
+                })()}
+              </ul>
+              <p className="text-sm text-ink-500 mb-6">
+                确定要跳过这些检查并标记为已交付吗？此操作可以继续，但建议完成所有检查项。
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={handleCancelDeliveryStatus}
+                  className="btn-secondary"
+                >
+                  返回检查
+                </button>
+                <button
+                  onClick={handleConfirmDeliveryStatus}
+                  className="btn-primary bg-amber-500 hover:bg-amber-600"
+                >
+                  确认交付
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

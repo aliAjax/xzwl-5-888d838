@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import type { HandpanRecord, FilterState, TuningRecord, DeliveryStatus, PhonemeDeviation, FollowUpRecord, FollowUpStatus, RecordConflict, DiffItem, VersionedBackup, ModeOption, FilterView } from "@/types/record";
+import type { HandpanRecord, FilterState, TuningRecord, DeliveryStatus, PhonemeDeviation, FollowUpRecord, FollowUpStatus, RecordConflict, DiffItem, VersionedBackup, ModeOption, FilterView, DeliveryChecklist } from "@/types/record";
 import { DEFAULT_MODE_OPTIONS } from "@/types/record";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { Header } from "@/components/Header";
@@ -546,6 +546,25 @@ function App() {
     if (detailRecord && detailRecord.id === recordId) {
       setDetailRecord(prev => prev ? { ...prev, deliveryStatus: status, updatedAt: new Date().toISOString() } : null);
     }
+    if (deliveryRecord && deliveryRecord.id === recordId) {
+      setDeliveryRecord(prev => prev ? { ...prev, deliveryStatus: status, updatedAt: new Date().toISOString() } : null);
+    }
+  };
+
+  const handleSaveDeliveryChecklist = (recordId: string, checklist: DeliveryChecklist) => {
+    setRecords(prev => 
+      prev.map(r => r.id === recordId ? { ...r, deliveryChecklist: checklist, updatedAt: new Date().toISOString() } : r)
+    );
+    if (detailRecord && detailRecord.id === recordId) {
+      setDetailRecord(prev => prev ? { ...prev, deliveryChecklist: checklist, updatedAt: new Date().toISOString() } : null);
+    }
+    if (deliveryRecord && deliveryRecord.id === recordId) {
+      setDeliveryRecord(prev => prev ? { ...prev, deliveryChecklist: checklist, updatedAt: new Date().toISOString() } : null);
+    }
+  };
+
+  const handleConfirmDelivery = (recordId: string) => {
+    handleUpdateRecordStatus(recordId, 'delivered');
   };
 
   const handleOpenTuningHistoryFromWorkbench = (record: HandpanRecord) => {
@@ -651,6 +670,8 @@ function App() {
         isOpen={isDeliveryOpen}
         onClose={handleCloseDelivery}
         record={deliveryRecord}
+        onSaveChecklist={handleSaveDeliveryChecklist}
+        onConfirmDelivery={handleConfirmDelivery}
       />
       <ModeManager
         isOpen={isModeManagerOpen}

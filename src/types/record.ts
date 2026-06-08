@@ -1,5 +1,13 @@
 export type DeliveryStatus = 'pending' | 'in-progress' | 'completed' | 'delivered';
 
+export interface DeliveryChecklist {
+  pitchReview: boolean;
+  appearanceCheck: boolean;
+  accessoriesConfirm: boolean;
+  customerInstructions: boolean;
+  remark: string;
+}
+
 export type FollowUpStatus = 'pending' | 'contacted' | 'needs-repair' | 'closed';
 
 export interface FollowUpRecord {
@@ -54,6 +62,7 @@ export interface HandpanRecord {
   tuningHistory: TuningRecord[];
   phonemeNames?: string[];
   followUp?: FollowUpData;
+  deliveryChecklist?: DeliveryChecklist;
   __version?: number;
 }
 
