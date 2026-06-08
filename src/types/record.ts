@@ -54,6 +54,26 @@ export interface HandpanRecord {
   tuningHistory: TuningRecord[];
   phonemeNames?: string[];
   followUp?: FollowUpData;
+  __version?: number;
+}
+
+export type ConflictResolution = 'keep-existing' | 'use-imported' | 'merge';
+
+export interface RecordConflict {
+  serialNumber: string;
+  existingRecord: HandpanRecord;
+  importedRecord: HandpanRecord;
+  existingUpdatedAt: string;
+  importedUpdatedAt: string;
+  isImportedNewer: boolean;
+  resolution: ConflictResolution;
+}
+
+export interface ImportConflictAnalysis {
+  canAutoMerge: boolean;
+  newerCount: number;
+  olderCount: number;
+  sameTimeCount: number;
 }
 
 export interface FilterState {

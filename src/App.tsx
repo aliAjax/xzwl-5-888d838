@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import type { HandpanRecord, FilterState, TuningRecord, DeliveryStatus, PhonemeDeviation, FollowUpRecord, FollowUpStatus } from "@/types/record";
+import type { HandpanRecord, FilterState, TuningRecord, DeliveryStatus, PhonemeDeviation, FollowUpRecord, FollowUpStatus, RecordConflict } from "@/types/record";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { Header } from "@/components/Header";
 import { FilterBar } from "@/components/FilterBar";
@@ -291,10 +291,10 @@ function App() {
     setImportFileName("");
   };
 
-  const handleConfirmImport = () => {
+  const handleConfirmImport = (conflicts: RecordConflict[]) => {
     if (!importAnalysis) return;
     
-    const mergedRecords = mergeImportedRecords(records, importAnalysis.valid);
+    const mergedRecords = mergeImportedRecords(records, importAnalysis.valid, { conflicts });
     setRecords(mergedRecords);
     
     setTimeout(() => {
@@ -303,7 +303,15 @@ function App() {
       cleanupInvalidTasks(validIds, deliveredIds);
     }, 0);
     
-    alert(`成功导入 ${importAnalysis.valid.length} 条记录`);
+    const newCount = importAnalysis.valid.length;
+    const updatedCount = conflicts.filter(c => c.resolution !== 'keep-existing').length;
+    
+    let message = `成功导入 ${newCount} 条新记录`;
+    if (updatedCount > 0) {
+      message += `，更新 ${updatedCount} 条冲突记录`;
+    }
+    
+    alert(message);
     handleCloseImport();
   };
 
