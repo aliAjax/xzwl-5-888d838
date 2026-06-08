@@ -1,12 +1,13 @@
-import { Download, Upload, Music2, Settings } from 'lucide-react';
+import { Download, Upload, Music2, Settings, Shield } from 'lucide-react';
 import { downloadExport } from '@/utils/storage';
 
 interface HeaderProps {
   onImportClick: () => void;
   onModeManagerClick: () => void;
+  onDataHealthClick: () => void;
 }
 
-export function Header({ onImportClick, onModeManagerClick }: HeaderProps) {
+export function Header({ onImportClick, onModeManagerClick, onDataHealthClick }: HeaderProps) {
   const handleExport = () => {
     downloadExport();
   };
@@ -29,6 +30,13 @@ export function Header({ onImportClick, onModeManagerClick }: HeaderProps) {
             </div>
           </div>
           <div className="flex items-center gap-3 self-start sm:self-auto flex-wrap">
+            <button
+              onClick={onDataHealthClick}
+              className="btn-secondary inline-flex items-center gap-2"
+            >
+              <Shield className="w-4 h-4" />
+              <span>数据体检</span>
+            </button>
             <button
               onClick={onModeManagerClick}
               className="btn-secondary inline-flex items-center gap-2"

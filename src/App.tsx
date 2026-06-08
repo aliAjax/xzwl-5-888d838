@@ -12,6 +12,7 @@ import { ImportPreview } from "@/components/ImportPreview";
 import { DeliveryOrder } from "@/components/DeliveryOrder";
 import { ModeManager } from "@/components/ModeManager";
 import { TuningWorkbench } from "@/components/TuningWorkbench";
+import { DataHealthCenter } from "@/components/DataHealthCenter";
 import { parseImportData, analyzeImportData, mergeImportedRecords, migrateRecords, generateTuningId, type ImportAnalysis } from "@/utils/storage";
 import { removeTasksByRecordId, cleanupInvalidTasks } from "@/utils/workbenchStorage";
 
@@ -153,6 +154,7 @@ function App() {
   const [deliveryRecord, setDeliveryRecord] = useState<HandpanRecord | null>(null);
   const [isModeManagerOpen, setIsModeManagerOpen] = useState(false);
   const [isWorkbenchOpen, setIsWorkbenchOpen] = useState(false);
+  const [isDataHealthOpen, setIsDataHealthOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -326,6 +328,18 @@ function App() {
     setIsWorkbenchOpen(false);
   };
 
+  const handleOpenDataHealth = () => {
+    setIsDataHealthOpen(true);
+  };
+
+  const handleCloseDataHealth = () => {
+    setIsDataHealthOpen(false);
+  };
+
+  const handleDataRepaired = (updatedRecords: HandpanRecord[]) => {
+    setRecords(updatedRecords);
+  };
+
   const handleUpdateRecordStatus = (recordId: string, status: DeliveryStatus) => {
     setRecords(prev => 
       prev.map(r => r.id === recordId ? { ...r, deliveryStatus: status, updatedAt: new Date().toISOString() } : r)
@@ -352,7 +366,7 @@ function App() {
         onChange={handleFileSelect}
         className="hidden"
       />
-      <Header onImportClick={handleImportClick} onModeManagerClick={handleOpenModeManager} />
+      <Header onImportClick={handleImportClick} onModeManagerClick={handleOpenModeManager} onDataHealthClick={handleOpenDataHealth} />
       <FilterBar filters={filters} onFilterChange={setFilters} records={records} onOpenWorkbench={handleOpenWorkbench} />
       <TuningReminderBoard records={records} filters={filters} onFilterChange={setFilters} />
       <RecordList 
@@ -398,6 +412,11 @@ function App() {
         records={records}
         onViewTuningHistory={handleOpenTuningHistoryFromWorkbench}
         onUpdateRecordStatus={handleUpdateRecordStatus}
+      />
+      <DataHealthCenter
+        isOpen={isDataHealthOpen}
+        onClose={handleCloseDataHealth}
+        onDataRepaired={handleDataRepaired}
       />
     </div>
   );
