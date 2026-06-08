@@ -734,13 +734,13 @@ export function MergeConflictResolver({
                                     </p>
                                     <p>
                                       <span className="font-medium">删除时间：</span>
-                                      {diff.imported?.deletedAt 
+                                      {diff.imported?.deletedAt
                                         ? new Date(diff.imported.deletedAt).toLocaleString()
                                         : '未知'}
                                     </p>
                                     <p>
                                       <span className="font-medium">删除设备：</span>
-                                      {diff.imported?.deletedBy 
+                                      {diff.imported?.deletedBy
                                         ? diff.imported.deletedBy.slice(0, 12)
                                         : '未知'}
                                     </p>

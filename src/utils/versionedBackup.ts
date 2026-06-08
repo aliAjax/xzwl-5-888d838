@@ -499,7 +499,7 @@ export const calculateModuleStats = (
         tombstoneStats.total++;
         tombstoneStats.added++;
       }
-    } else if (diff.changeType === 'deleted' || 
+    } else if (diff.changeType === 'deleted' ||
                (diff.changeType === 'conflict' && diff.fieldConflicts?.includes('deleted'))) {
       const tombstoneStats = moduleStatsMap.get('tombstones');
       if (tombstoneStats) {
@@ -546,12 +546,12 @@ export const filterDiffsByModuleOptions = (
     if (diff.fieldConflicts?.includes('tombstone')) {
       return moduleOptions.tombstones;
     }
-    
-    if (diff.changeType === 'deleted' || 
+
+    if (diff.changeType === 'deleted' ||
         (diff.changeType === 'conflict' && diff.fieldConflicts?.includes('deleted'))) {
       return moduleOptions.tombstones;
     }
-    
+
     const moduleType = ENTITY_TYPE_TO_MODULE_TYPE[diff.entityType];
     return moduleOptions[moduleType];
   });
